@@ -399,20 +399,23 @@ export default function App() {
             {allTags.length === 0 && (
               <p className="px-4 text-xs text-slate-400 dark:text-slate-500">태그가 없습니다.</p>
             )}
-            {allTags.map(([tag, count]) => (
-              <button
-                key={tag}
-                onClick={() => toggleTag(tag)}
-                aria-pressed={selectedTags.includes(tag)}
-                className={navButton(selectedTags.includes(tag))}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <TagIcon size={16} className="flex-shrink-0" />
-                  <span className="truncate">{tag}</span>
-                </div>
-                <span className={countBadge}>{count}</span>
-              </button>
-            ))}
+            {/* On small screens the tag list scrolls horizontally instead of pushing notes down. */}
+            <div className="flex md:block gap-2 md:space-y-1 overflow-x-auto md:overflow-visible -mx-4 px-4 md:mx-0 md:px-0 pb-1 md:pb-0">
+              {allTags.map(([tag, count]) => (
+                <button
+                  key={tag}
+                  onClick={() => toggleTag(tag)}
+                  aria-pressed={selectedTags.includes(tag)}
+                  className={`${navButton(selectedTags.includes(tag))} !w-auto md:!w-full flex-shrink-0 gap-3 border border-slate-200 dark:border-slate-800 md:border-transparent md:dark:border-transparent`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <TagIcon size={16} className="flex-shrink-0" />
+                    <span className="truncate">{tag}</span>
+                  </div>
+                  <span className={countBadge}>{count}</span>
+                </button>
+              ))}
+            </div>
           </nav>
         </aside>
 
