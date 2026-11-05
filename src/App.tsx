@@ -3,390 +3,187 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useMemo, useId } from 'react';
-import { 
-  Plus, 
-  Search, 
-  Trash2, 
-  Tag as TagIcon, 
-  X, 
-  Calendar,
-  Layers,
-  ChevronRight
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import {
-  type Note,
-  getBrowserStorage,
-  loadNotes,
-  parseTags,
-  saveNotes,
-} from './lib/notes';
-
-const SEED_DATA: Note[] = [
-  {
-    id: 1,
-    title: "시안 작업 가이드",
-    body: "디자인 시스템을 준수하여 피그마 시안을 작업하는 방법론 정리.",
-    tags: ["디자인", "가이드"],
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 2,
-    title: "읽어야 할 책 리스트",
-    body: "클린 코드, 리팩터링, 테크니컬 라이팅 실전 가이드.",
-    tags: ["독서", "자기개발"],
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 3,
-    title: "프로젝트 아이디어",
-    body: "AI 기반의 개인 메모 관리 시스템 및 일기 자동 생성 서비스.",
-    tags: ["업무", "개발"],
-    updatedAt: new Date().toISOString(),
-  }
-];
+import { useState, useEffect, useMemo, useRef, useCallback, useDeferredValue } from 'react';
+import { AnimatePresence, MotionConfig } from 'motion/react';
+import { getBrowserStorage } from './lib/notes';
+import { type SortKey, type View, countTags, queryNotes } from './lib/search';
+import { loadSortPref, saveSortPref } from './lib/sortPref';
+import { useNotes } from './hooks/useNotes';
+import { useNoteEditor } from './hooks/useNoteEditor';
+import { useTheme } from './hooks/useTheme';
+import { useToast } from './hooks/useToast';
+import { useTransfer } from './hooks/useTransfer';
+import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
+import Header from './components/Header';
+import Sidebar from './components/Sidebar';
+import CorruptDataBanner from './components/CorruptDataBanner';
+import ListToolbar from './components/ListToolbar';
+import NoteList from './components/NoteList';
+import NoteEditorDialog from './components/NoteEditorDialog';
+import ToastRegion from './components/Toast';
+import ImportDialog from './components/ImportDialog';
+import TagManagerDialog from './components/TagManagerDialog';
 
 export default function App() {
-  const [notes, setNotes] = useState<Note[]>(() => loadNotes(getBrowserStorage(), SEED_DATA));
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [toast, setToast] = useToast();
+  const { notes, setNotes, saveNote, deleteNote, togglePin, toggleArchive, renameTag, deleteTag } = useNotes(setToast);
+  const { themePref, cycleTheme } = useTheme();
+  const { pendingImport, handleExport, handleFileChosen, confirmImport, cancelImport } = useTransfer(
+    notes,
+    setNotes,
+    setToast,
+  );
+
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  
-  // Form state
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const [tagsInput, setTagsInput] = useState('');
-  // null = creating a new note; otherwise the id of the note being edited
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const fieldId = useId();
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [view, setView] = useState<View>('active');
+  const [sort, setSort] = useState<SortKey>(() => loadSortPref(getBrowserStorage()));
+  const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  // Element that opened a dialog, so focus can return there when it closes.
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const editor = useNoteEditor(returnFocusRef, saveNote);
 
-  // Single source of persistence: every change to `notes` (including the
-  // initial seed and deleting the last note) is written to storage here.
   useEffect(() => {
-    saveNotes(getBrowserStorage(), notes);
-  }, [notes]);
+    saveSortPref(getBrowserStorage(), sort);
+  }, [sort]);
 
-  // Close the modal with Escape.
-  useEffect(() => {
-    if (!isModalOpen) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeModal();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isModalOpen]);
+  const focusSearch = useCallback(() => searchRef.current?.focus(), []);
+  useGlobalShortcuts(editor.isOpen || pendingImport !== null || isTagManagerOpen, focusSearch, editor.openNew);
 
-  const allTags = useMemo(() => {
-    const counts: Record<string, number> = {};
-    notes.forEach(note => {
-      note.tags.forEach(tag => {
-        counts[tag] = (counts[tag] || 0) + 1;
-      });
-    });
-    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  }, [notes]);
+  // Every tag in use (most frequent first), for suggestions in the editor.
+  const allTagCounts = useMemo(() => countTags(notes), [notes]);
+  const knownTags = useMemo(() => allTagCounts.map(([tag]) => tag), [allTagCounts]);
+  const closeTagManager = useCallback(() => setIsTagManagerOpen(false), []);
+  const editingNote = editor.editingId === null ? undefined : notes.find(n => n.id === editor.editingId);
 
-  const filteredNotes = useMemo(() => {
-    return notes.filter(note => {
-      const matchesSearch = 
-        note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        note.body.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        note.tags.some(t => t.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-      const matchesTag = selectedTag ? note.tags.includes(selectedTag) : true;
-      
-      return matchesSearch && matchesTag;
-    }).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  }, [notes, searchTerm, selectedTag]);
+  const activeCount = useMemo(() => notes.filter(n => !n.archived).length, [notes]);
+  const archivedCount = notes.length - activeCount;
 
-  const openNewModal = () => {
-    setEditingId(null);
-    setTitle('');
-    setBody('');
-    setTagsInput('');
-    setIsModalOpen(true);
+  const viewTags = useMemo(() => countTags(notes.filter(n => n.archived === (view === 'archived'))), [notes, view]);
+
+  // Ignore selected tags that no longer exist in the current view (e.g. after
+  // deleting the last note with that tag), so the list never filters to empty.
+  const activeTags = useMemo(
+    () => selectedTags.filter(t => viewTags.some(([tag]) => tag === t)),
+    [selectedTags, viewTags],
+  );
+
+  // Typing stays responsive with many notes: filtering uses a deferred copy.
+  const deferredSearch = useDeferredValue(searchTerm);
+  const filteredNotes = useMemo(
+    () => queryNotes(notes, { search: deferredSearch, tags: activeTags, view, sort }),
+    [notes, deferredSearch, activeTags, view, sort],
+  );
+  const queryKey = JSON.stringify([deferredSearch, activeTags, view, sort]);
+
+  const toggleTag = (tag: string) =>
+    setSelectedTags(activeTags.includes(tag) ? activeTags.filter(t => t !== tag) : [...activeTags, tag]);
+
+  const switchView = (next: View) => {
+    setView(next);
+    setSelectedTags([]);
   };
 
-  const openEditModal = (note: Note) => {
-    setEditingId(note.id);
-    setTitle(note.title);
-    setBody(note.body);
-    setTagsInput(note.tags.join(', '));
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setEditingId(null);
-    setTitle('');
-    setBody('');
-    setTagsInput('');
-  };
-
-  const handleSaveNote = () => {
-    if (!title.trim()) return;
-
-    const fields = {
-      title: title.trim(),
-      body: body.trim(),
-      tags: parseTags(tagsInput),
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (editingId === null) {
-      setNotes(prev => [{ id: Date.now(), ...fields }, ...prev]);
-    } else {
-      setNotes(prev => prev.map(n => (n.id === editingId ? { ...n, ...fields } : n)));
-    }
-
-    closeModal();
-  };
-
-  const handleDeleteNote = (id: number) => {
-    if (window.confirm('정말 이 메모를 삭제할까요?')) {
-      setNotes(prev => prev.filter(n => n.id !== id));
-    }
-  };
+  const isFiltering = searchTerm.trim() !== '' || activeTags.length > 0;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900">
-      {/* Header */}
-      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white">
-              <Layers size={18} strokeWidth={2.5} />
-            </div>
-            <h1 className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600">
-              MyMemo
-            </h1>
-          </div>
+    // Honour the OS "reduce motion" setting for transform/layout animations.
+    <MotionConfig reducedMotion="user">
+      <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans selection:bg-indigo-100 selection:text-indigo-900">
+        <Header
+          searchRef={searchRef}
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          onExport={handleExport}
+          onFileChosen={handleFileChosen}
+          themePref={themePref}
+          onCycleTheme={cycleTheme}
+          onNewNote={editor.openNew}
+          returnFocusRef={returnFocusRef}
+        />
 
-          <div className="flex-1 max-w-md relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={18} />
-            <input 
-              type="search" 
-              aria-label="메모 검색"
-              placeholder="메모 검색..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-100 border-transparent border focus:border-indigo-500 focus:bg-white rounded-full outline-none transition-all text-sm"
+        <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col md:flex-row gap-8">
+          <Sidebar
+            view={view}
+            activeCount={activeCount}
+            archivedCount={archivedCount}
+            tags={viewTags}
+            activeTags={activeTags}
+            hasAnyTags={knownTags.length > 0}
+            onSwitchView={switchView}
+            onToggleTag={toggleTag}
+            onOpenTagManager={e => {
+              returnFocusRef.current = e.currentTarget;
+              setIsTagManagerOpen(true);
+            }}
+          />
+
+          <main className="flex-1 min-w-0">
+            <CorruptDataBanner />
+            <ListToolbar
+              view={view}
+              resultCount={filteredNotes.length}
+              activeTags={activeTags}
+              onToggleTag={toggleTag}
+              onClearTags={() => setSelectedTags([])}
+              sort={sort}
+              onSortChange={setSort}
             />
-          </div>
-
-          <button 
-            onClick={openNewModal}
-            aria-label="새 메모"
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-full font-medium transition-colors shadow-lg shadow-indigo-200"
-          >
-            <Plus size={18} />
-            <span className="hidden sm:inline">새 메모</span>
-          </button>
+            <NoteList
+              notes={filteredNotes}
+              queryKey={queryKey}
+              query={deferredSearch}
+              selectedTags={activeTags}
+              view={view}
+              isFiltering={isFiltering}
+              onOpen={editor.openEdit}
+              onDelete={deleteNote}
+              onTogglePin={togglePin}
+              onToggleArchive={toggleArchive}
+              onTagClick={toggleTag}
+            />
+          </main>
         </div>
-      </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col md:flex-row gap-8">
-        {/* Sidebar */}
-        <aside className="w-full md:w-64 flex-shrink-0">
-          <nav className="space-y-1">
-            <button 
-              onClick={() => setSelectedTag(null)}
-              aria-pressed={!selectedTag}
-              className={`w-full flex items-center justify-between px-4 py-2 rounded-lg text-sm font-medium transition-colors ${!selectedTag ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100'}`}
-            >
-              <div className="flex items-center gap-2">
-                <Layers size={16} />
-                <span>전체</span>
-              </div>
-              <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">{notes.length}</span>
-            </button>
-            
-            <div className="pt-4 pb-2 px-4">
-              <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">태그 목록</h2>
-            </div>
-            
-            {allTags.map(([tag, count]) => (
-              <button 
-                key={tag}
-                onClick={() => setSelectedTag(tag === selectedTag ? null : tag)}
-                aria-pressed={selectedTag === tag}
-                className={`w-full flex items-center justify-between px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedTag === tag ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100'}`}
-              >
-                <div className="flex items-center gap-2">
-                  <TagIcon size={16} />
-                  <span>{tag}</span>
-                </div>
-                <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">{count}</span>
-              </button>
-            ))}
-          </nav>
-        </aside>
+        <ToastRegion toast={toast} onDismiss={() => setToast(null)} />
 
-        {/* Main Content */}
-        <main className="flex-1">
-          {filteredNotes.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-slate-400 bg-white border border-dashed border-slate-200 rounded-3xl">
-              <Layers size={48} className="mb-4 opacity-20" />
-              <p>검색 결과에 맞는 메모가 없습니다.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              <AnimatePresence mode="popLayout">
-                {filteredNotes.map((note) => (
-                  <motion.div 
-                    layout
-                    key={note.id}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="group relative bg-white border border-slate-200 rounded-2xl p-5 hover:shadow-xl hover:shadow-slate-200/50 hover:border-indigo-100 focus-within:border-indigo-300 transition-all cursor-pointer"
-                  >
-                    <button 
-                      type="button"
-                      onClick={() => handleDeleteNote(note.id)}
-                      aria-label={`'${note.title}' 메모 삭제`}
-                      className="absolute z-10 top-4 right-4 p-2 text-slate-400 hover:text-rose-500 bg-slate-50 hover:bg-rose-50 rounded-lg transition-all focus-visible:outline-2 focus-visible:outline-rose-500 opacity-100 pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-
-                    <div className="flex items-center gap-2 text-xs font-medium text-slate-400 mb-3">
-                      <Calendar size={12} />
-                      {new Date(note.updatedAt).toLocaleDateString()}
-                    </div>
-
-                    <h3 className="font-bold text-lg mb-2 text-slate-800 line-clamp-1 group-hover:text-indigo-600 transition-colors">
-                      {/* Stretched button: the whole card opens the editor. */}
-                      <button
-                        type="button"
-                        onClick={() => openEditModal(note)}
-                        className="text-left after:absolute after:inset-0 after:rounded-2xl focus:outline-none"
-                      >
-                        {note.title}
-                      </button>
-                    </h3>
-                    
-                    <p className="text-slate-600 text-sm leading-relaxed mb-4 line-clamp-3">
-                      {note.body}
-                    </p>
-
-                    <div className="flex flex-wrap gap-1.5 mt-auto">
-                      {note.tags.map(tag => (
-                        <span key={tag} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[10px] font-bold uppercase tracking-wider">
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-          )}
-        </main>
-      </div>
-
-      {/* New / Edit Note Modal */}
-      <AnimatePresence>
-        {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={closeModal}
-              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+        <AnimatePresence>
+          {isTagManagerOpen && (
+            <TagManagerDialog
+              tags={allTagCounts}
+              onRename={(from, to) => {
+                renameTag(from, to);
+                setSelectedTags(prev => [...new Set(prev.map(t => (t === from ? to.trim() : t)))]);
+              }}
+              onDelete={deleteTag}
+              onClose={closeTagManager}
+              returnFocusTo={returnFocusRef}
             />
-            
-            <motion.div 
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby={`${fieldId}-heading`}
-              initial={{ opacity: 0, y: 20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.95 }}
-              className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden"
-            >
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 id={`${fieldId}-heading`} className="text-2xl font-bold text-slate-800 tracking-tight">
-                    {editingId === null ? '새로운 메모 작성' : '메모 수정'}
-                  </h2>
-                  <button 
-                    type="button"
-                    onClick={closeModal}
-                    aria-label="닫기"
-                    className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
+          )}
+        </AnimatePresence>
 
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor={`${fieldId}-title`} className="block text-sm font-semibold text-slate-700 mb-1">제목</label>
-                    <input 
-                      id={`${fieldId}-title`}
-                      type="text" 
-                      autoFocus
-                      required
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="메모의 제목을 입력하세요"
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50/50 rounded-xl outline-none transition-all"
-                    />
-                  </div>
+        <AnimatePresence>
+          {pendingImport && (
+            <ImportDialog
+              fileName={pendingImport.fileName}
+              notes={pendingImport.notes}
+              skipped={pendingImport.skipped}
+              existingCount={notes.length}
+              onConfirm={confirmImport}
+              onCancel={cancelImport}
+              returnFocusTo={returnFocusRef}
+            />
+          )}
+        </AnimatePresence>
 
-                  <div>
-                    <label htmlFor={`${fieldId}-body`} className="block text-sm font-semibold text-slate-700 mb-1">본문</label>
-                    <textarea 
-                      id={`${fieldId}-body`}
-                      rows={4}
-                      value={body}
-                      onChange={(e) => setBody(e.target.value)}
-                      placeholder="내용을 자유롭게 적어보세요..."
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50/50 rounded-xl outline-none transition-all resize-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor={`${fieldId}-tags`} className="block text-sm font-semibold text-slate-700 mb-1">태그 (쉼표로 구분)</label>
-                    <div className="relative group">
-                      <TagIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500" size={16} />
-                      <input 
-                        id={`${fieldId}-tags`}
-                        type="text" 
-                        value={tagsInput}
-                        onChange={(e) => setTagsInput(e.target.value)}
-                        placeholder="예: 업무, 중요, 프로젝트"
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50/50 rounded-xl outline-none transition-all"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-8 flex gap-3">
-                  <button 
-                    onClick={closeModal}
-                    className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-colors"
-                  >
-                    취소
-                  </button>
-                  <button 
-                    onClick={handleSaveNote}
-                    disabled={!title.trim()}
-                    className="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 text-white font-semibold rounded-xl transition-colors shadow-lg shadow-indigo-200 flex items-center justify-center gap-2"
-                  >
-                    <span>메모 저장</span>
-                    <ChevronRight size={18} />
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </div>
+        <NoteEditorDialog
+          editor={editor}
+          editingNote={editingNote}
+          knownTags={knownTags}
+          returnFocusRef={returnFocusRef}
+        />
+      </div>
+    </MotionConfig>
   );
 }
-

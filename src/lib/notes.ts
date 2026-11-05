@@ -3,7 +3,13 @@ export type Note = {
   title: string;
   body: string;
   tags: string[];
+  /** ISO timestamp of creation. Older stored notes fall back to updatedAt. */
+  createdAt: string;
   updatedAt: string;
+  /** Pinned notes are listed before the others. */
+  pinned: boolean;
+  /** Archived notes are hidden from the main list. */
+  archived: boolean;
 };
 
 export const STORAGE_KEY = 'mymemo.notes';
@@ -30,20 +36,33 @@ export function normalizeTags(tags: unknown[]): string[] {
   return [...seen];
 }
 
-function toNote(value: unknown): Note | null {
-  if (!value || typeof value !== 'object') return null;
+function isDateString(value: unknown): value is string {
+  return typeof value === 'string' && !Number.isNaN(Date.parse(value));
+}
+
+/**
+ * Validate and normalize an unknown value into a Note.
+ * Returns null when the required fields (finite numeric id, string title) are
+ * missing; optional fields get safe defaults.
+ */
+export function toNote(value: unknown): Note | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const v = value as Record<string, unknown>;
-  if (typeof v.id !== 'number' || typeof v.title !== 'string') return null;
-  const updatedAt =
-    typeof v.updatedAt === 'string' && !Number.isNaN(Date.parse(v.updatedAt))
-      ? v.updatedAt
-      : new Date(0).toISOString();
+  // Ids must be positive safe integers so `id + 1` and comparisons stay exact.
+  if (typeof v.id !== 'number' || !Number.isSafeInteger(v.id) || v.id <= 0 || typeof v.title !== 'string') {
+    return null;
+  }
+  const updatedAt = isDateString(v.updatedAt) ? v.updatedAt : new Date(0).toISOString();
+  const createdAt = isDateString(v.createdAt) ? v.createdAt : updatedAt;
   return {
     id: v.id,
     title: v.title,
     body: typeof v.body === 'string' ? v.body : '',
     tags: Array.isArray(v.tags) ? normalizeTags(v.tags) : [],
+    createdAt,
     updatedAt,
+    pinned: v.pinned === true,
+    archived: v.archived === true,
   };
 }
 
@@ -65,11 +84,8 @@ export function loadNotes(storage: ReadableStorage | null, fallback: Note[]): No
   }
   if (raw === null) return fallback;
 
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) throw new Error('stored notes are not an array');
-    return parsed.map(toNote).filter((n): n is Note => n !== null);
-  } catch {
+  const notes = parseStoredNotes(raw);
+  if (notes === null) {
     try {
       storage.setItem(BACKUP_KEY, raw);
     } catch {
@@ -77,6 +93,50 @@ export function loadNotes(storage: ReadableStorage | null, fallback: Note[]): No
     }
     return [];
   }
+  return notes;
+}
+
+/**
+ * Parse the JSON stored under STORAGE_KEY. Returns null when it is not a JSON
+ * array; malformed entries are dropped.
+ */
+export function parseStoredNotes(raw: string): Note[] | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    return parsed.map(toNote).filter((n): n is Note => n !== null);
+  } catch {
+    return null;
+  }
+}
+
+/** Read the raw value saved by loadNotes when stored data was corrupt. */
+export function readCorruptBackup(storage: ReadableStorage | null): string | null {
+  try {
+    return storage?.getItem(BACKUP_KEY) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearCorruptBackup(storage: Pick<Storage, 'removeItem'> | null): void {
+  try {
+    storage?.removeItem(BACKUP_KEY);
+  } catch {
+    // Ignore.
+  }
+}
+
+/**
+ * Pick an id for a new note: the current time, or one past the largest id in
+ * use if that is larger (avoids collisions when created in the same ms or when
+ * imported ids are in the future). Uses a loop so huge lists can't overflow
+ * the call stack the way `Math.max(...ids)` would.
+ */
+export function nextNoteId(notes: readonly Note[], now: number = Date.now()): number {
+  let max = 0;
+  for (const n of notes) if (n.id > max) max = n.id;
+  return Math.max(now, max + 1);
 }
 
 /** Persist notes. Returns false if storage is unavailable or full. */
