@@ -74,9 +74,7 @@ const NoteCard = forwardRef<HTMLDivElement, Props>(function NoteCard(
       </div>
 
       <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400 mb-3 pr-28">
-        {note.pinned && (
-          <span className="text-indigo-600 dark:text-indigo-400">고정됨 ·</span>
-        )}
+        {note.pinned && <span className="text-indigo-600 dark:text-indigo-400">고정됨 ·</span>}
         <Calendar size={12} />
         <time dateTime={note.updatedAt}>{new Date(note.updatedAt).toLocaleDateString()}</time>
       </div>

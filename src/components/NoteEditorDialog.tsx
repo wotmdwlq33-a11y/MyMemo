@@ -24,7 +24,8 @@ type Props = {
  * follow `editor.isOpen` directly while the dialog animates out.
  */
 export default function NoteEditorDialog({ editor, editingNote, knownTags, returnFocusRef }: Props) {
-  const { isOpen, editingId, title, setTitle, body, setBody, tagsInput, setTagsInput, close, requestClose, save } = editor;
+  const { isOpen, editingId, title, setTitle, body, setBody, tagsInput, setTagsInput, close, requestClose, save } =
+    editor;
   const fieldId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const tagsFieldRef = useRef<HTMLInputElement>(null);
@@ -67,7 +68,7 @@ export default function NoteEditorDialog({ editor, editingNote, knownTags, retur
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            onKeyDown={(e) => {
+            onKeyDown={e => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 save();
@@ -77,7 +78,10 @@ export default function NoteEditorDialog({ editor, editingNote, knownTags, retur
           >
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 id={`${fieldId}-heading`} className="text-2xl font-bold text-slate-800 dark:text-slate-100 tracking-tight">
+                <h2
+                  id={`${fieldId}-heading`}
+                  className="text-2xl font-bold text-slate-800 dark:text-slate-100 tracking-tight"
+                >
                   {editingId === null ? '새로운 메모 작성' : '메모 수정'}
                 </h2>
                 <button
@@ -92,41 +96,59 @@ export default function NoteEditorDialog({ editor, editingNote, knownTags, retur
 
               <div className="space-y-4">
                 <div>
-                  <label htmlFor={`${fieldId}-title`} className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">제목</label>
+                  <label
+                    htmlFor={`${fieldId}-title`}
+                    className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1"
+                  >
+                    제목
+                  </label>
                   <input
                     id={`${fieldId}-title`}
                     type="text"
                     autoFocus
                     required
                     value={title}
-                    onChange={(e) => setTitle(e.target.value)}
+                    onChange={e => setTitle(e.target.value)}
                     placeholder="메모의 제목을 입력하세요"
                     className={fieldClass}
                   />
                 </div>
 
                 <div>
-                  <label htmlFor={`${fieldId}-body`} className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">본문</label>
+                  <label
+                    htmlFor={`${fieldId}-body`}
+                    className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1"
+                  >
+                    본문
+                  </label>
                   <textarea
                     id={`${fieldId}-body`}
                     rows={4}
                     value={body}
-                    onChange={(e) => setBody(e.target.value)}
+                    onChange={e => setBody(e.target.value)}
                     placeholder="내용을 자유롭게 적어보세요..."
                     className={`${fieldClass} resize-none`}
                   />
                 </div>
 
                 <div>
-                  <label htmlFor={`${fieldId}-tags`} className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">태그 (쉼표로 구분)</label>
+                  <label
+                    htmlFor={`${fieldId}-tags`}
+                    className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1"
+                  >
+                    태그 (쉼표로 구분)
+                  </label>
                   <div className="relative group">
-                    <TagIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500" size={16} />
+                    <TagIcon
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500"
+                      size={16}
+                    />
                     <input
                       ref={tagsFieldRef}
                       id={`${fieldId}-tags`}
                       type="text"
                       value={tagsInput}
-                      onChange={(e) => setTagsInput(e.target.value)}
+                      onChange={e => setTagsInput(e.target.value)}
                       placeholder="예: 업무, 중요, 프로젝트"
                       aria-describedby={tagSuggestions.length > 0 ? `${fieldId}-tag-suggestions` : undefined}
                       className={`${fieldClass} pl-10`}

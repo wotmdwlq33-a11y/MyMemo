@@ -110,9 +110,7 @@ describe('loadNotes', () => {
   });
 
   it('migrates notes saved before createdAt/pinned/archived existed', () => {
-    const raw = JSON.stringify([
-      { id: 3, title: 'old', body: 'b', tags: [], updatedAt: '2025-05-05T00:00:00.000Z' },
-    ]);
+    const raw = JSON.stringify([{ id: 3, title: 'old', body: 'b', tags: [], updatedAt: '2025-05-05T00:00:00.000Z' }]);
     expect(loadNotes(memoryStorage({ [STORAGE_KEY]: raw }), SEED)).toEqual([
       {
         id: 3,
@@ -181,7 +179,12 @@ describe('parseStoredNotes', () => {
 
 describe('corrupt backup helpers', () => {
   it('reads and clears the backup', () => {
-    const storage = { ...memoryStorage({ [BACKUP_KEY]: 'raw' }), removeItem(k: string) { this.data.delete(k); } };
+    const storage = {
+      ...memoryStorage({ [BACKUP_KEY]: 'raw' }),
+      removeItem(k: string) {
+        this.data.delete(k);
+      },
+    };
     expect(readCorruptBackup(storage)).toBe('raw');
     clearCorruptBackup(storage);
     expect(readCorruptBackup(storage)).toBeNull();

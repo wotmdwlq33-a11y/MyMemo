@@ -32,16 +32,19 @@ export function useNoteEditor(
         : document.querySelector<HTMLElement>('[data-new-note]');
   }, [returnFocusRef]);
 
-  const openWith = useCallback((id: number | null, form: typeof EMPTY_FORM) => {
-    rememberOpener();
-    modalOpenRef.current = true;
-    initialFormRef.current = form;
-    setEditingId(id);
-    setTitle(form.title);
-    setBody(form.body);
-    setTagsInput(form.tags);
-    setIsOpen(true);
-  }, [rememberOpener]);
+  const openWith = useCallback(
+    (id: number | null, form: typeof EMPTY_FORM) => {
+      rememberOpener();
+      modalOpenRef.current = true;
+      initialFormRef.current = form;
+      setEditingId(id);
+      setTitle(form.title);
+      setBody(form.body);
+      setTagsInput(form.tags);
+      setIsOpen(true);
+    },
+    [rememberOpener],
+  );
 
   const openNew = useCallback(() => openWith(null, EMPTY_FORM), [openWith]);
 

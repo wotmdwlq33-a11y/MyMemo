@@ -2,11 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 
 export const STORAGE_KEY = 'mymemo.notes';
 
-export const SEED_TITLES = [
-  '시안 작업 가이드',
-  '읽어야 할 책 리스트',
-  '프로젝트 아이디어',
-] as const;
+export const SEED_TITLES = ['시안 작업 가이드', '읽어야 할 책 리스트', '프로젝트 아이디어'] as const;
 
 export interface NoteInput {
   title: string;
@@ -59,7 +55,7 @@ export async function addNote(page: Page, note: NoteInput): Promise<void> {
 
 /** Read the persisted notes straight from localStorage. */
 export async function readStoredNotes(page: Page): Promise<Array<{ title: string; body: string; tags: string[] }>> {
-  return page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? '[]'), STORAGE_KEY);
+  return page.evaluate(key => JSON.parse(localStorage.getItem(key) ?? '[]'), STORAGE_KEY);
 }
 
 /**
@@ -71,7 +67,9 @@ export async function waitForAnimations(page: Page): Promise<void> {
     .poll(() =>
       page.evaluate(() =>
         [...document.querySelectorAll<HTMLElement>('[data-testid="note-card"], [role="dialog"]')].every(
-          el => getComputedStyle(el).opacity === '1' && ['none', 'matrix(1, 0, 0, 1, 0, 0)'].includes(getComputedStyle(el).transform),
+          el =>
+            getComputedStyle(el).opacity === '1' &&
+            ['none', 'matrix(1, 0, 0, 1, 0, 0)'].includes(getComputedStyle(el).transform),
         ),
       ),
     )

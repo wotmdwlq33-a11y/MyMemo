@@ -4,7 +4,7 @@ import { gotoApp } from './helpers';
 // Simulates registerServiceWorker announcing a waiting worker, using a fake
 // registration so the test does not depend on real service-worker update timing.
 async function announceFakeUpdate(page: Page, { withWaiting = true } = {}): Promise<void> {
-  await page.evaluate((withWaiting) => {
+  await page.evaluate(withWaiting => {
     const w = window as unknown as { __swMessages: unknown[] };
     w.__swMessages = [];
     const registration = {
@@ -47,10 +47,7 @@ test('새로고침 reloads directly when nothing is waiting any more', async ({ 
   await gotoApp(page);
   await page.evaluate(() => ((window as unknown as { __marker: boolean }).__marker = true));
   await announceFakeUpdate(page, { withWaiting: false });
-  await Promise.all([
-    page.waitForEvent('load'),
-    updatePrompt(page).getByRole('button', { name: '새로고침' }).click(),
-  ]);
+  await Promise.all([page.waitForEvent('load'), updatePrompt(page).getByRole('button', { name: '새로고침' }).click()]);
   await expect(page.getByRole('button', { name: '새 메모' })).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { __marker?: boolean }).__marker)).toBeUndefined();
   await expect(page.getByText('새 버전이 준비되었습니다')).toHaveCount(0);

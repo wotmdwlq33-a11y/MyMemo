@@ -39,14 +39,22 @@ export default function Sidebar({
   return (
     <aside className="w-full md:w-64 flex-shrink-0">
       <nav className="space-y-1" aria-label="메모 분류">
-        <button onClick={() => onSwitchView('active')} aria-pressed={view === 'active' && noTagFilter} className={navButton(view === 'active' && noTagFilter)}>
+        <button
+          onClick={() => onSwitchView('active')}
+          aria-pressed={view === 'active' && noTagFilter}
+          className={navButton(view === 'active' && noTagFilter)}
+        >
           <div className="flex items-center gap-2">
             <Layers size={16} />
             <span>전체</span>
           </div>
           <span className={countBadge}>{activeCount}</span>
         </button>
-        <button onClick={() => onSwitchView('archived')} aria-pressed={view === 'archived' && noTagFilter} className={navButton(view === 'archived' && noTagFilter)}>
+        <button
+          onClick={() => onSwitchView('archived')}
+          aria-pressed={view === 'archived' && noTagFilter}
+          className={navButton(view === 'archived' && noTagFilter)}
+        >
           <div className="flex items-center gap-2">
             <Archive size={16} />
             <span>보관함</span>
@@ -55,7 +63,9 @@ export default function Sidebar({
         </button>
 
         <div className="pt-4 pb-2 px-4 flex items-center justify-between">
-          <h2 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">태그 목록</h2>
+          <h2 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            태그 목록
+          </h2>
           {hasAnyTags && (
             <button
               type="button"
@@ -68,9 +78,7 @@ export default function Sidebar({
           )}
         </div>
 
-        {tags.length === 0 && (
-          <p className="px-4 text-xs text-slate-500 dark:text-slate-400">태그가 없습니다.</p>
-        )}
+        {tags.length === 0 && <p className="px-4 text-xs text-slate-500 dark:text-slate-400">태그가 없습니다.</p>}
         {/* On small screens the tag list scrolls horizontally instead of pushing notes down. */}
         <div className="flex md:block gap-2 md:space-y-1 overflow-x-auto md:overflow-visible -mx-4 px-4 md:mx-0 md:px-0 pb-1 md:pb-0">
           {tags.map(([tag, count]) => (

@@ -1,7 +1,14 @@
 import { type ChangeEvent, useCallback, useState } from 'react';
 import type { Note } from '../lib/notes';
 import { downloadText } from '../lib/download';
-import { type ImportMode, MAX_IMPORT_BYTES, applyImport, exportFileName, exportNotes, parseImport } from '../lib/transfer';
+import {
+  type ImportMode,
+  MAX_IMPORT_BYTES,
+  applyImport,
+  exportFileName,
+  exportNotes,
+  parseImport,
+} from '../lib/transfer';
 import type { SetToast } from './useToast';
 
 export type PendingImport = { fileName: string; notes: Note[]; skipped: number };
@@ -41,8 +48,11 @@ export function useTransfer(notes: Note[], setNotes: (notes: Note[]) => void, se
 
   const confirmImport = (mode: ImportMode) => {
     if (!pendingImport) return;
-    if (mode === 'replace' && notes.length > 0 &&
-      !window.confirm(`현재 메모 ${notes.length}개가 모두 지워지고 가져온 메모로 바뀝니다. 계속할까요?`)) {
+    if (
+      mode === 'replace' &&
+      notes.length > 0 &&
+      !window.confirm(`현재 메모 ${notes.length}개가 모두 지워지고 가져온 메모로 바뀝니다. 계속할까요?`)
+    ) {
       return;
     }
     const result = applyImport(notes, pendingImport.notes, mode);
@@ -50,9 +60,10 @@ export function useTransfer(notes: Note[], setNotes: (notes: Note[]) => void, se
     setPendingImport(null);
     setToast({
       kind: 'info',
-      text: mode === 'replace'
-        ? `메모 ${result.added}개로 바꿨습니다.`
-        : `가져오기 완료: ${result.added}개 추가, ${result.updated}개 갱신, ${result.unchanged}개 유지`,
+      text:
+        mode === 'replace'
+          ? `메모 ${result.added}개로 바꿨습니다.`
+          : `가져오기 완료: ${result.added}개 추가, ${result.updated}개 갱신, ${result.unchanged}개 유지`,
     });
   };
 

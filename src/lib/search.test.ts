@@ -3,9 +3,31 @@ import { type NoteQuery, countTags, highlight, queryNotes } from './search';
 import { makeNote } from './testNote';
 
 const notes = [
-  makeNote({ id: 1, title: 'Banana', body: 'yellow fruit', tags: ['과일', '노랑'], createdAt: '2026-01-03T00:00:00Z', updatedAt: '2026-01-04T00:00:00Z' }),
-  makeNote({ id: 2, title: 'apple', body: 'red', tags: ['과일'], createdAt: '2026-01-05T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z' }),
-  makeNote({ id: 3, title: '참외', body: 'Korean melon', tags: ['노랑'], createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-06T00:00:00Z', pinned: true }),
+  makeNote({
+    id: 1,
+    title: 'Banana',
+    body: 'yellow fruit',
+    tags: ['과일', '노랑'],
+    createdAt: '2026-01-03T00:00:00Z',
+    updatedAt: '2026-01-04T00:00:00Z',
+  }),
+  makeNote({
+    id: 2,
+    title: 'apple',
+    body: 'red',
+    tags: ['과일'],
+    createdAt: '2026-01-05T00:00:00Z',
+    updatedAt: '2026-01-02T00:00:00Z',
+  }),
+  makeNote({
+    id: 3,
+    title: '참외',
+    body: 'Korean melon',
+    tags: ['노랑'],
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-06T00:00:00Z',
+    pinned: true,
+  }),
   makeNote({ id: 4, title: 'archived', tags: ['과일'], archived: true }),
 ];
 

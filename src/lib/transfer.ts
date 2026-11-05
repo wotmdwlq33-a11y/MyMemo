@@ -12,9 +12,7 @@ export type ExportFile = {
   notes: Note[];
 };
 
-export type ImportResult =
-  | { ok: true; notes: Note[]; skipped: number }
-  | { ok: false; error: string };
+export type ImportResult = { ok: true; notes: Note[]; skipped: number } | { ok: false; error: string };
 
 export type ImportMode = 'merge' | 'replace';
 

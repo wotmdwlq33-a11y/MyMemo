@@ -11,7 +11,14 @@ describe('theme preference', () => {
     expect(loadThemePref(null)).toBe('system');
     expect(loadThemePref(mem())).toBe('system');
     expect(loadThemePref(mem({ [THEME_KEY]: 'purple' }))).toBe('system');
-    expect(loadThemePref({ getItem: () => { throw new Error('x'); }, setItem: () => {} })).toBe('system');
+    expect(
+      loadThemePref({
+        getItem: () => {
+          throw new Error('x');
+        },
+        setItem: () => {},
+      }),
+    ).toBe('system');
   });
 
   it('round-trips a saved preference', () => {

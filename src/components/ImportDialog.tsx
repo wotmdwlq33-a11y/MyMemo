@@ -17,7 +17,15 @@ type Props = {
 };
 
 /** Ask whether imported notes should be merged into or replace the current list. */
-export default function ImportDialog({ fileName, notes, skipped, existingCount, onConfirm, onCancel, returnFocusTo }: Props) {
+export default function ImportDialog({
+  fileName,
+  notes,
+  skipped,
+  existingCount,
+  onConfirm,
+  onCancel,
+  returnFocusTo,
+}: Props) {
   const id = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   useFocusTrap(dialogRef, true, returnFocusTo);
@@ -50,7 +58,10 @@ export default function ImportDialog({ fileName, notes, skipped, existingCount, 
         className="relative w-full max-w-md bg-white dark:bg-slate-900 dark:border dark:border-slate-800 rounded-3xl shadow-2xl p-6"
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 id={`${id}-heading`} className="text-xl font-bold text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-2">
+          <h2
+            id={`${id}-heading`}
+            className="text-xl font-bold text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-2"
+          >
             <Upload size={20} className="text-indigo-600 dark:text-indigo-400" />
             메모 가져오기
           </h2>

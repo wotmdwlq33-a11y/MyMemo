@@ -48,7 +48,10 @@ export default function Header({
         </div>
 
         <div className="flex-1 max-w-md relative group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={18} />
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors"
+            size={18}
+          />
           <input
             ref={searchRef}
             type="search"
@@ -56,22 +59,31 @@ export default function Header({
             aria-keyshortcuts="/"
             placeholder="메모 검색... ( / )"
             value={searchTerm}
-            onChange={(e) => onSearchChange(e.target.value)}
+            onChange={e => onSearchChange(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 border-transparent border focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 rounded-full outline-none transition-all text-sm"
           />
         </div>
 
         <div className="flex items-center gap-1">
-          <button type="button" onClick={onExport} aria-label="내보내기" title="JSON으로 내보내기" className={headerIconButton}>
+          <button
+            type="button"
+            onClick={onExport}
+            aria-label="내보내기"
+            title="JSON으로 내보내기"
+            className={headerIconButton}
+          >
             <Download size={18} />
           </button>
           <button
             type="button"
-            onClick={(e) => {
+            onClick={e => {
               returnFocusRef.current = e.currentTarget;
               fileInputRef.current?.click();
             }}
-            aria-label="가져오기" title="JSON 가져오기" className={headerIconButton}>
+            aria-label="가져오기"
+            title="JSON 가져오기"
+            className={headerIconButton}
+          >
             <Upload size={18} />
           </button>
           <input

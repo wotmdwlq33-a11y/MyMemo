@@ -28,7 +28,10 @@ export function useNotes(setToast: SetToast) {
   useEffect(() => {
     const ok = saveNotes(getBrowserStorage(), notes);
     if (!ok && !saveFailed.current) {
-      setToast({ kind: 'error', text: '브라우저 저장소에 저장하지 못했습니다. 공간이 부족하거나 저장소가 차단되었을 수 있어요. 내보내기로 백업해 두세요.' });
+      setToast({
+        kind: 'error',
+        text: '브라우저 저장소에 저장하지 못했습니다. 공간이 부족하거나 저장소가 차단되었을 수 있어요. 내보내기로 백업해 두세요.',
+      });
     }
     saveFailed.current = !ok;
   }, [notes, setToast]);
@@ -51,7 +54,8 @@ export function useNotes(setToast: SetToast) {
   const requestPersistentStorage = () => {
     if (persistRequested.current) return;
     persistRequested.current = true;
-    void navigator.storage?.persisted?.()
+    void navigator.storage
+      ?.persisted?.()
       .then(already => (already ? true : navigator.storage.persist?.()))
       .catch(() => undefined);
   };
@@ -67,17 +71,17 @@ export function useNotes(setToast: SetToast) {
     };
 
     if (editingId === null) {
-      setNotes(prev => [
-        { id: nextNoteId(prev), ...fields, createdAt: now, pinned: false, archived: false },
-        ...prev,
-      ]);
+      setNotes(prev => [{ id: nextNoteId(prev), ...fields, createdAt: now, pinned: false, archived: false }, ...prev]);
     } else {
       const original = notes.find(n => n.id === editingId);
       setNotes(prev =>
         prev.some(n => n.id === editingId)
           ? prev.map(n => (n.id === editingId ? { ...n, ...fields } : n))
           : // Deleted meanwhile (e.g. in another tab): keep the user's edit.
-            [{ ...(original ?? { id: nextNoteId(prev), createdAt: now, pinned: false, archived: false }), ...fields }, ...prev],
+            [
+              { ...(original ?? { id: nextNoteId(prev), createdAt: now, pinned: false, archived: false }), ...fields },
+              ...prev,
+            ],
       );
     }
 
@@ -113,7 +117,12 @@ export function useNotes(setToast: SetToast) {
 
   const toggleArchive = (note: Note) => {
     setNotes(prev => prev.map(n => (n.id === note.id ? { ...n, archived: !n.archived } : n)));
-    setToast({ kind: 'info', text: note.archived ? `'${note.title}' 메모를 보관함에서 꺼냈습니다.` : `'${note.title}' 메모를 보관함으로 옮겼습니다.` });
+    setToast({
+      kind: 'info',
+      text: note.archived
+        ? `'${note.title}' 메모를 보관함에서 꺼냈습니다.`
+        : `'${note.title}' 메모를 보관함으로 옮겼습니다.`,
+    });
   };
 
   const renameTag = (from: string, to: string) => setNotes(prev => renameTagIn(prev, from, to));

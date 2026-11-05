@@ -28,8 +28,11 @@ export default function App() {
   const [toast, setToast] = useToast();
   const { notes, setNotes, saveNote, deleteNote, togglePin, toggleArchive, renameTag, deleteTag } = useNotes(setToast);
   const { themePref, cycleTheme } = useTheme();
-  const { pendingImport, handleExport, handleFileChosen, confirmImport, cancelImport } =
-    useTransfer(notes, setNotes, setToast);
+  const { pendingImport, handleExport, handleFileChosen, confirmImport, cancelImport } = useTransfer(
+    notes,
+    setNotes,
+    setToast,
+  );
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -57,10 +60,7 @@ export default function App() {
   const activeCount = useMemo(() => notes.filter(n => !n.archived).length, [notes]);
   const archivedCount = notes.length - activeCount;
 
-  const viewTags = useMemo(
-    () => countTags(notes.filter(n => n.archived === (view === 'archived'))),
-    [notes, view],
-  );
+  const viewTags = useMemo(() => countTags(notes.filter(n => n.archived === (view === 'archived'))), [notes, view]);
 
   // Ignore selected tags that no longer exist in the current view (e.g. after
   // deleting the last note with that tag), so the list never filters to empty.
@@ -111,7 +111,7 @@ export default function App() {
           hasAnyTags={knownTags.length > 0}
           onSwitchView={switchView}
           onToggleTag={toggleTag}
-          onOpenTagManager={(e) => {
+          onOpenTagManager={e => {
             returnFocusRef.current = e.currentTarget;
             setIsTagManagerOpen(true);
           }}

@@ -31,7 +31,7 @@ test('adds a new note', async ({ page }) => {
 
   const stored = await readStoredNotes(page);
   expect(stored).toHaveLength(SEED_TITLES.length + 1);
-  expect(stored.find((n) => n.title === 'E2E 새 메모')).toMatchObject({
+  expect(stored.find(n => n.title === 'E2E 새 메모')).toMatchObject({
     body: '플레이라이트 본문',
     tags: ['테스트', 'e2e'],
   });
@@ -76,7 +76,7 @@ test('deletes a note immediately without a blocking dialog', async ({ page }) =>
   await expect(noteCard(page, target)).toHaveCount(0);
   await expect(page.getByRole('status')).toContainText('삭제했습니다');
   const stored = await readStoredNotes(page);
-  expect(stored.map((n) => n.title)).not.toContain(target);
+  expect(stored.map(n => n.title)).not.toContain(target);
 });
 
 test('undo restores a deleted note in its place', async ({ page }) => {
@@ -135,5 +135,5 @@ test('double-clicking save creates only one note', async ({ page }) => {
   await noteDialog(page).getByRole('button', { name: '메모 저장' }).dblclick();
   await expect(noteDialog(page)).toBeHidden();
   const stored = await readStoredNotes(page);
-  expect(stored.filter((n) => n.title === '한 번만')).toHaveLength(1);
+  expect(stored.filter(n => n.title === '한 번만')).toHaveLength(1);
 });

@@ -44,17 +44,17 @@ export default function NoteList({
   const limit = paging.key === queryKey ? paging.limit : PAGE_SIZE;
   const visibleNotes = notes.slice(0, limit);
   const remaining = notes.length - visibleNotes.length;
-  const showMore = useCallback(
-    () => setPaging({ key: queryKey, limit: limit + PAGE_SIZE }),
-    [queryKey, limit],
-  );
+  const showMore = useCallback(() => setPaging({ key: queryKey, limit: limit + PAGE_SIZE }), [queryKey, limit]);
   const sentinelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el || remaining <= 0 || typeof IntersectionObserver === 'undefined') return;
-    const observer = new IntersectionObserver(entries => {
-      if (entries.some(e => e.isIntersecting)) showMore();
-    }, { rootMargin: '600px' });
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(e => e.isIntersecting)) showMore();
+      },
+      { rootMargin: '600px' },
+    );
     observer.observe(el);
     return () => observer.disconnect();
   }, [remaining, showMore]);
@@ -71,14 +71,16 @@ export default function NoteList({
           ) : (
             <>
               <Layers size={48} className="mb-4 opacity-20" />
-              <p>{isFiltering ? '검색 결과에 맞는 메모가 없습니다.' : '아직 메모가 없습니다. 새 메모를 작성해 보세요.'}</p>
+              <p>
+                {isFiltering ? '검색 결과에 맞는 메모가 없습니다.' : '아직 메모가 없습니다. 새 메모를 작성해 보세요.'}
+              </p>
             </>
           )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           <AnimatePresence mode="popLayout">
-            {visibleNotes.map((note) => (
+            {visibleNotes.map(note => (
               <NoteCard
                 key={note.id}
                 note={note}

@@ -48,15 +48,16 @@ e2e 테스트를 처음 실행할 때는 브라우저가 필요합니다: `npx p
 
 ## 스크립트
 
-| 명령 | 설명 |
-|---|---|
-| `npm run dev` | 개발 서버 실행 (포트 3000) |
-| `npm run build` | 프로덕션 빌드 (`dist/`) |
-| `npm run preview` | 빌드 결과 미리보기 |
-| `npm run lint` | TypeScript 타입 검사(strict) + ESLint (react-hooks 규칙 포함) |
-| `npm test` | Vitest 단위 테스트 실행 |
-| `npm run e2e` | Playwright e2e 테스트 (빌드 후 `vite preview` :4173에서 실행) |
-| `npm run clean` | `dist/` 삭제 |
+| 명령              | 설명                                                          |
+| ----------------- | ------------------------------------------------------------- |
+| `npm run dev`     | 개발 서버 실행 (포트 3000)                                    |
+| `npm run build`   | 프로덕션 빌드 (`dist/`)                                       |
+| `npm run preview` | 빌드 결과 미리보기                                            |
+| `npm run lint`    | TypeScript 타입 검사(strict) + ESLint (react-hooks 규칙 포함) |
+| `npm run format`  | Prettier로 코드 정리 (`format:check`는 검사만, CI에서 실행)   |
+| `npm test`        | Vitest 단위 테스트 실행                                       |
+| `npm run e2e`     | Playwright e2e 테스트 (빌드 후 `vite preview` :4173에서 실행) |
+| `npm run clean`   | `dist/` 삭제                                                  |
 
 ## 프로젝트 구조
 
@@ -88,12 +89,29 @@ e2e/                         Playwright 테스트
 기기를 옮기거나 백업하려면 헤더의 내보내기 버튼으로 `mymemo-YYYY-MM-DD.json` 파일을 받아 두세요. 형식은 다음과 같습니다.
 
 ```json
-{ "format": "mymemo", "version": 1, "exportedAt": "…", "notes": [ { "id": 1, "title": "…", "body": "…", "tags": [], "createdAt": "…", "updatedAt": "…", "pinned": false, "archived": false } ] }
+{
+  "format": "mymemo",
+  "version": 1,
+  "exportedAt": "…",
+  "notes": [
+    {
+      "id": 1,
+      "title": "…",
+      "body": "…",
+      "tags": [],
+      "createdAt": "…",
+      "updatedAt": "…",
+      "pinned": false,
+      "archived": false
+    }
+  ]
+}
 ```
 
 메모 배열만 있는 JSON도 가져올 수 있습니다. `id`(양의 정수)와 `title`(문자열)이 없는 항목은 건너뜁니다.
 
 병합 규칙:
+
 - `id`와 `createdAt`이 모두 같으면 같은 메모로 보고, `updatedAt`이 더 최근인 쪽을 남깁니다.
 - `id`만 같고 `createdAt`이 다르면(예: 기기마다 따로 만들어진 샘플 메모) 서로 다른 메모로 보고, 가져온 메모를 새 id로 추가합니다.
 - 삭제 기록은 남지 않으므로, 이 기기에서 지운 메모도 파일에 있으면 다시 추가됩니다.

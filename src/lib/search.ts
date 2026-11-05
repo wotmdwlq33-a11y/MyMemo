@@ -29,9 +29,7 @@ export function queryNotes(notes: Note[], q: NoteQuery): Note[] {
     if (!q.tags.every(t => note.tags.includes(t))) return false;
     if (!needle) return true;
     return (
-      includesCI(note.title, needle) ||
-      includesCI(note.body, needle) ||
-      note.tags.some(t => includesCI(t, needle))
+      includesCI(note.title, needle) || includesCI(note.body, needle) || note.tags.some(t => includesCI(t, needle))
     );
   });
   return filtered.sort((a, b) => {

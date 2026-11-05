@@ -11,7 +11,14 @@ describe('sort preference', () => {
     expect(loadSortPref(null)).toBe('updated');
     expect(loadSortPref(mem())).toBe('updated');
     expect(loadSortPref(mem({ [SORT_KEY]: 'random' }))).toBe('updated');
-    expect(loadSortPref({ getItem: () => { throw new Error('x'); }, setItem: () => {} })).toBe('updated');
+    expect(
+      loadSortPref({
+        getItem: () => {
+          throw new Error('x');
+        },
+        setItem: () => {},
+      }),
+    ).toBe('updated');
   });
 
   it('round-trips each sort key under mymemo.sort', () => {
@@ -24,7 +31,17 @@ describe('sort preference', () => {
   });
 
   it('ignores storage write failures', () => {
-    expect(() => saveSortPref({ getItem: () => null, setItem: () => { throw new Error('full'); } }, 'title')).not.toThrow();
+    expect(() =>
+      saveSortPref(
+        {
+          getItem: () => null,
+          setItem: () => {
+            throw new Error('full');
+          },
+        },
+        'title',
+      ),
+    ).not.toThrow();
     expect(() => saveSortPref(null, 'title')).not.toThrow();
   });
 });

@@ -14,7 +14,10 @@ test('pinned notes stay on top and persist', async ({ page }) => {
 
   await page.reload();
   expect((await cardTitles(page))[0]).toBe('읽어야 할 책 리스트');
-  await expect(page.getByRole('button', { name: "'읽어야 할 책 리스트' 고정 해제" })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: "'읽어야 할 책 리스트' 고정 해제" })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
 });
 
 test('archiving moves a note to the archive view and back', async ({ page }) => {
@@ -36,7 +39,10 @@ test('tag chips combine filters and can be removed', async ({ page }) => {
   await gotoApp(page);
   await addNote(page, { title: '디자인 회고', tags: '디자인, 회고' });
 
-  await page.getByRole('navigation', { name: '메모 분류' }).getByRole('button', { name: /^디자인/ }).click();
+  await page
+    .getByRole('navigation', { name: '메모 분류' })
+    .getByRole('button', { name: /^디자인/ })
+    .click();
   await expect(page.getByTestId('note-card')).toHaveCount(2);
   await page.getByTestId('note-card').getByRole('button', { name: '#회고', exact: true }).click();
   await expect(page.getByTestId('note-card')).toHaveCount(1);

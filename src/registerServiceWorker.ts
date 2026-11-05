@@ -41,7 +41,7 @@ export function resetUpdateState(): void {
 
 function announceUpdate(win: Window, registration: ServiceWorkerRegistration): void {
   pendingUpdate = registration;
-  win.dispatchEvent(new CustomEvent(SW_UPDATE_EVENT, {detail: registration}));
+  win.dispatchEvent(new CustomEvent(SW_UPDATE_EVENT, { detail: registration }));
 }
 
 let reloading = false;
@@ -65,8 +65,8 @@ export function activateUpdate(
     reload();
     return;
   }
-  nav.serviceWorker.addEventListener('controllerchange', reload, {once: true});
-  waiting.postMessage({type: 'SKIP_WAITING'});
+  nav.serviceWorker.addEventListener('controllerchange', reload, { once: true });
+  waiting.postMessage({ type: 'SKIP_WAITING' });
 }
 
 function watchForUpdates(
@@ -116,8 +116,8 @@ export function registerServiceWorker(options: RegisterOptions = {}): void {
 
   const register = () => {
     nav.serviceWorker
-      .register(`${baseUrl}sw.js`, {scope: baseUrl})
-      .then((registration) => watchForUpdates(registration, win, nav, updateIntervalMs))
+      .register(`${baseUrl}sw.js`, { scope: baseUrl })
+      .then(registration => watchForUpdates(registration, win, nav, updateIntervalMs))
       .catch((err: unknown) => {
         console.warn('Service worker registration failed:', err);
       });
@@ -126,6 +126,6 @@ export function registerServiceWorker(options: RegisterOptions = {}): void {
   if (win.document.readyState === 'complete') {
     register();
   } else {
-    win.addEventListener('load', register, {once: true});
+    win.addEventListener('load', register, { once: true });
   }
 }

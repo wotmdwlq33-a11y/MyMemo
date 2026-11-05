@@ -4,7 +4,7 @@ const CACHE_PREFIX = 'mymemo-';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 // Resolve against the registration scope so this works under a non-root BASE_URL.
-const scopeUrl = (path) => new URL(path, self.registration.scope).href;
+const scopeUrl = path => new URL(path, self.registration.scope).href;
 
 const APP_SHELL = [
   './',
@@ -37,7 +37,7 @@ function assetUrlsFromHtml(html) {
 
 async function precache() {
   const cache = await caches.open(CACHE_NAME);
-  await cache.addAll(APP_SHELL.map((url) => new Request(url, { cache: 'reload' })));
+  await cache.addAll(APP_SHELL.map(url => new Request(url, { cache: 'reload' })));
   const index = await cache.match(INDEX_URL);
   if (index) {
     const assets = assetUrlsFromHtml(await index.text());
@@ -49,23 +49,21 @@ async function precache() {
 // activates right away (and clients.claim() takes the page). On an update it waits
 // until the page asks for it via SKIP_WAITING, so a deploy never swaps the worker
 // (and prunes cached assets) under a page that is still running the old bundle.
-self.addEventListener('install', (event) => {
+self.addEventListener('install', event => {
   event.waitUntil(precache());
 });
 
-self.addEventListener('message', (event) => {
+self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
+self.addEventListener('activate', event => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) =>
+      .then(keys =>
         Promise.all(
-          keys
-            .filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
-            .map((key) => caches.delete(key)),
+          keys.filter(key => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME).map(key => caches.delete(key)),
         ),
       )
       .then(() => self.clients.claim()),
@@ -96,8 +94,8 @@ async function pruneAssets(cache, html) {
   const keys = await cache.keys();
   await Promise.all(
     keys
-      .filter((req) => new URL(req.url).pathname.includes('/assets/') && !keep.has(req.url))
-      .map((req) => cache.delete(req)),
+      .filter(req => new URL(req.url).pathname.includes('/assets/') && !keep.has(req.url))
+      .map(req => cache.delete(req)),
   );
 }
 
@@ -119,7 +117,7 @@ async function networkFirstNavigation(event) {
       event.waitUntil(
         copy
           .text()
-          .then(async (html) => {
+          .then(async html => {
             await cache.put(INDEX_URL, new Response(html, { headers: copy.headers }));
             await pruneAssets(cache, html);
           })
@@ -129,8 +127,7 @@ async function networkFirstNavigation(event) {
     return response;
   } catch (err) {
     const cached =
-      (await cache.match(INDEX_URL, { ignoreVary: true })) ||
-      (await cache.match(SCOPE_ROOT, { ignoreVary: true }));
+      (await cache.match(INDEX_URL, { ignoreVary: true })) || (await cache.match(SCOPE_ROOT, { ignoreVary: true }));
     if (cached) return cleanResponse(cached);
     throw err;
   }
@@ -143,7 +140,7 @@ async function staleWhileRevalidate(event) {
   // carry an Origin header that precached requests lack; the bytes are the same.
   const cached = await cache.match(request, { ignoreVary: true });
   const network = fetch(request)
-    .then((response) => {
+    .then(response => {
       if (response && response.ok && response.type === 'basic') {
         cache.put(request, response.clone());
       }
@@ -162,7 +159,7 @@ async function staleWhileRevalidate(event) {
   return response || Response.error();
 }
 
-self.addEventListener('fetch', (event) => {
+self.addEventListener('fetch', event => {
   const { request } = event;
   if (request.method !== 'GET') return;
 

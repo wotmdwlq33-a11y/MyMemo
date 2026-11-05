@@ -66,7 +66,10 @@ export default function TagManagerDialog({ tags, onRename, onDelete, onClose, re
         className="relative w-full max-w-md max-h-[80vh] flex flex-col bg-white dark:bg-slate-900 dark:border dark:border-slate-800 rounded-3xl shadow-2xl p-6"
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 id={`${id}-heading`} className="text-xl font-bold text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-2">
+          <h2
+            id={`${id}-heading`}
+            className="text-xl font-bold text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-2"
+          >
             <TagIcon size={20} className="text-indigo-600 dark:text-indigo-400" />
             태그 관리
           </h2>
@@ -80,14 +83,18 @@ export default function TagManagerDialog({ tags, onRename, onDelete, onClose, re
           </button>
         </div>
         <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-          이름을 바꾸면 모든 메모에 반영되고, 같은 이름의 태그가 있으면 하나로 합쳐집니다. 태그를 삭제해도 메모는 남습니다.
+          이름을 바꾸면 모든 메모에 반영되고, 같은 이름의 태그가 있으면 하나로 합쳐집니다. 태그를 삭제해도 메모는
+          남습니다.
         </p>
         {tags.length === 0 ? (
           <p className="text-sm text-slate-500 dark:text-slate-400">태그가 없습니다.</p>
         ) : (
           <ul className="overflow-y-auto -mx-2 px-2 space-y-1">
             {tags.map(([tag, count]) => (
-              <li key={tag} className="flex items-center gap-2 py-1.5 border-b border-slate-100 dark:border-slate-800 last:border-0">
+              <li
+                key={tag}
+                className="flex items-center gap-2 py-1.5 border-b border-slate-100 dark:border-slate-800 last:border-0"
+              >
                 {editing === tag ? (
                   <form
                     className="flex-1 flex items-center gap-2"
@@ -104,17 +111,31 @@ export default function TagManagerDialog({ tags, onRename, onDelete, onClose, re
                       aria-invalid={invalid}
                       className="flex-1 min-w-0 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 rounded-lg outline-none text-sm"
                     />
-                    <button type="submit" disabled={invalid} aria-label="이름 저장" className={`${iconButton} hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 disabled:opacity-40`}>
+                    <button
+                      type="submit"
+                      disabled={invalid}
+                      aria-label="이름 저장"
+                      className={`${iconButton} hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 disabled:opacity-40`}
+                    >
                       <Check size={16} />
                     </button>
-                    <button type="button" onClick={() => setEditing(null)} aria-label="이름 변경 취소" className={`${iconButton} hover:bg-slate-100 dark:hover:bg-slate-800`}>
+                    <button
+                      type="button"
+                      onClick={() => setEditing(null)}
+                      aria-label="이름 변경 취소"
+                      className={`${iconButton} hover:bg-slate-100 dark:hover:bg-slate-800`}
+                    >
                       <X size={16} />
                     </button>
                   </form>
                 ) : (
                   <>
-                    <span className="flex-1 min-w-0 truncate text-sm font-medium text-slate-700 dark:text-slate-200">#{tag}</span>
-                    <span className="text-xs bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 px-2 py-0.5 rounded-full">{count}</span>
+                    <span className="flex-1 min-w-0 truncate text-sm font-medium text-slate-700 dark:text-slate-200">
+                      #{tag}
+                    </span>
+                    <span className="text-xs bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 px-2 py-0.5 rounded-full">
+                      {count}
+                    </span>
                     <button
                       type="button"
                       onClick={() => {
@@ -129,7 +150,8 @@ export default function TagManagerDialog({ tags, onRename, onDelete, onClose, re
                     <button
                       type="button"
                       onClick={() => {
-                        if (window.confirm(`'${tag}' 태그를 메모 ${count}개에서 삭제할까요? 메모는 지워지지 않습니다.`)) onDelete(tag);
+                        if (window.confirm(`'${tag}' 태그를 메모 ${count}개에서 삭제할까요? 메모는 지워지지 않습니다.`))
+                          onDelete(tag);
                       }}
                       aria-label={`'${tag}' 태그 삭제`}
                       className={`${iconButton} hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10`}
@@ -142,7 +164,11 @@ export default function TagManagerDialog({ tags, onRename, onDelete, onClose, re
             ))}
           </ul>
         )}
-        {invalid && <p role="alert" className="mt-2 text-xs text-rose-600 dark:text-rose-400">태그 이름에는 쉼표를 쓸 수 없습니다.</p>}
+        {invalid && (
+          <p role="alert" className="mt-2 text-xs text-rose-600 dark:text-rose-400">
+            태그 이름에는 쉼표를 쓸 수 없습니다.
+          </p>
+        )}
       </motion.div>
     </div>
   );
