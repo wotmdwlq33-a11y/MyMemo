@@ -22,6 +22,9 @@
           var dark = pref === 'dark' || (pref !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
           document.documentElement.classList.toggle('dark', dark);
           document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+          document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) {
+            m.setAttribute('content', dark ? '#1e1b4b' : '#4f46e5');
+          });
         } catch (e) {}
       })();
     </script>
