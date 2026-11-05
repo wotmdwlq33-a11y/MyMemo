@@ -3,7 +3,13 @@ export type Note = {
   title: string;
   body: string;
   tags: string[];
+  /** ISO timestamp of creation. Older stored notes fall back to updatedAt. */
+  createdAt: string;
   updatedAt: string;
+  /** Pinned notes are listed before the others. */
+  pinned: boolean;
+  /** Archived notes are hidden from the main list. */
+  archived: boolean;
 };
 
 export const STORAGE_KEY = 'mymemo.notes';
@@ -30,20 +36,32 @@ export function normalizeTags(tags: unknown[]): string[] {
   return [...seen];
 }
 
-function toNote(value: unknown): Note | null {
-  if (!value || typeof value !== 'object') return null;
+function isDateString(value: unknown): value is string {
+  return typeof value === 'string' && !Number.isNaN(Date.parse(value));
+}
+
+/**
+ * Validate and normalize an unknown value into a Note.
+ * Returns null when the required fields (finite numeric id, string title) are
+ * missing; optional fields get safe defaults.
+ */
+export function toNote(value: unknown): Note | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const v = value as Record<string, unknown>;
-  if (typeof v.id !== 'number' || typeof v.title !== 'string') return null;
-  const updatedAt =
-    typeof v.updatedAt === 'string' && !Number.isNaN(Date.parse(v.updatedAt))
-      ? v.updatedAt
-      : new Date(0).toISOString();
+  if (typeof v.id !== 'number' || !Number.isFinite(v.id) || typeof v.title !== 'string') {
+    return null;
+  }
+  const updatedAt = isDateString(v.updatedAt) ? v.updatedAt : new Date(0).toISOString();
+  const createdAt = isDateString(v.createdAt) ? v.createdAt : updatedAt;
   return {
     id: v.id,
     title: v.title,
     body: typeof v.body === 'string' ? v.body : '',
     tags: Array.isArray(v.tags) ? normalizeTags(v.tags) : [],
+    createdAt,
     updatedAt,
+    pinned: v.pinned === true,
+    archived: v.archived === true,
   };
 }
 

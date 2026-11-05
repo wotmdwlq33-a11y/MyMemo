@@ -25,7 +25,10 @@ const note = (over: Partial<Note> = {}): Note => ({
   title: '제목',
   body: '본문',
   tags: ['a'],
+  createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
+  pinned: false,
+  archived: false,
   ...over,
 });
 
@@ -89,8 +92,42 @@ describe('loadNotes', () => {
       { id: 2, title: 't', tags: ['x', ' x ', '', 3], updatedAt: 'not a date' },
     ]);
     expect(loadNotes(memoryStorage({ [STORAGE_KEY]: raw }), SEED)).toEqual([
-      { id: 2, title: 't', body: '', tags: ['x'], updatedAt: new Date(0).toISOString() },
+      {
+        id: 2,
+        title: 't',
+        body: '',
+        tags: ['x'],
+        createdAt: new Date(0).toISOString(),
+        updatedAt: new Date(0).toISOString(),
+        pinned: false,
+        archived: false,
+      },
     ]);
+  });
+
+  it('migrates notes saved before createdAt/pinned/archived existed', () => {
+    const raw = JSON.stringify([
+      { id: 3, title: 'old', body: 'b', tags: [], updatedAt: '2025-05-05T00:00:00.000Z' },
+    ]);
+    expect(loadNotes(memoryStorage({ [STORAGE_KEY]: raw }), SEED)).toEqual([
+      {
+        id: 3,
+        title: 'old',
+        body: 'b',
+        tags: [],
+        createdAt: '2025-05-05T00:00:00.000Z',
+        updatedAt: '2025-05-05T00:00:00.000Z',
+        pinned: false,
+        archived: false,
+      },
+    ]);
+  });
+
+  it('only accepts literal true for pinned/archived', () => {
+    const raw = JSON.stringify([{ id: 4, title: 't', pinned: 'yes', archived: 1 }]);
+    const [n] = loadNotes(memoryStorage({ [STORAGE_KEY]: raw }), SEED);
+    expect(n.pinned).toBe(false);
+    expect(n.archived).toBe(false);
   });
 });
 
