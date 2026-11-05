@@ -44,7 +44,7 @@ e2e 테스트를 처음 실행할 때는 브라우저가 필요합니다: `npx p
 | `npm run dev` | 개발 서버 실행 (포트 3000) |
 | `npm run build` | 프로덕션 빌드 (`dist/`) |
 | `npm run preview` | 빌드 결과 미리보기 |
-| `npm run lint` | TypeScript 타입 검사 (`tsc --noEmit`) |
+| `npm run lint` | TypeScript 타입 검사(strict) + ESLint (react-hooks 규칙 포함) |
 | `npm test` | Vitest 단위 테스트 실행 |
 | `npm run e2e` | Playwright e2e 테스트 (빌드 후 `vite preview` :4173에서 실행) |
 | `npm run clean` | `dist/` 삭제 |

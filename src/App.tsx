@@ -171,21 +171,20 @@ export default function App() {
     [notes, view],
   );
 
-  // Drop selected tags that no longer exist in the current view.
-  useEffect(() => {
-    setSelectedTags(prev => {
-      const next = prev.filter(t => allTags.some(([tag]) => tag === t));
-      return next.length === prev.length ? prev : next;
-    });
-  }, [allTags]);
+  // Ignore selected tags that no longer exist in the current view (e.g. after
+  // deleting the last note with that tag), so the list never filters to empty.
+  const activeTags = useMemo(
+    () => selectedTags.filter(t => allTags.some(([tag]) => tag === t)),
+    [selectedTags, allTags],
+  );
 
   const filteredNotes = useMemo(
-    () => queryNotes(notes, { search: searchTerm, tags: selectedTags, view, sort }),
-    [notes, searchTerm, selectedTags, view, sort],
+    () => queryNotes(notes, { search: searchTerm, tags: activeTags, view, sort }),
+    [notes, searchTerm, activeTags, view, sort],
   );
 
   const toggleTag = (tag: string) =>
-    setSelectedTags(prev => (prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]));
+    setSelectedTags(activeTags.includes(tag) ? activeTags.filter(t => t !== tag) : [...activeTags, tag]);
 
   const switchView = (next: View) => {
     setView(next);
@@ -308,7 +307,7 @@ export default function App() {
         : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
     }`;
   const countBadge = 'text-xs bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400 px-2 py-0.5 rounded-full';
-  const isFiltering = searchTerm.trim() !== '' || selectedTags.length > 0;
+  const isFiltering = searchTerm.trim() !== '' || activeTags.length > 0;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans selection:bg-indigo-100 selection:text-indigo-900">
@@ -377,14 +376,14 @@ export default function App() {
         {/* Sidebar */}
         <aside className="w-full md:w-64 flex-shrink-0">
           <nav className="space-y-1" aria-label="메모 분류">
-            <button onClick={() => switchView('active')} aria-pressed={view === 'active' && selectedTags.length === 0} className={navButton(view === 'active' && selectedTags.length === 0)}>
+            <button onClick={() => switchView('active')} aria-pressed={view === 'active' && activeTags.length === 0} className={navButton(view === 'active' && activeTags.length === 0)}>
               <div className="flex items-center gap-2">
                 <Layers size={16} />
                 <span>전체</span>
               </div>
               <span className={countBadge}>{activeCount}</span>
             </button>
-            <button onClick={() => switchView('archived')} aria-pressed={view === 'archived' && selectedTags.length === 0} className={navButton(view === 'archived' && selectedTags.length === 0)}>
+            <button onClick={() => switchView('archived')} aria-pressed={view === 'archived' && activeTags.length === 0} className={navButton(view === 'archived' && activeTags.length === 0)}>
               <div className="flex items-center gap-2">
                 <Archive size={16} />
                 <span>보관함</span>
@@ -405,8 +404,8 @@ export default function App() {
                 <button
                   key={tag}
                   onClick={() => toggleTag(tag)}
-                  aria-pressed={selectedTags.includes(tag)}
-                  className={`${navButton(selectedTags.includes(tag))} !w-auto md:!w-full flex-shrink-0 gap-3 border border-slate-200 dark:border-slate-800 md:border-transparent md:dark:border-transparent`}
+                  aria-pressed={activeTags.includes(tag)}
+                  className={`${navButton(activeTags.includes(tag))} !w-auto md:!w-full flex-shrink-0 gap-3 border border-slate-200 dark:border-slate-800 md:border-transparent md:dark:border-transparent`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <TagIcon size={16} className="flex-shrink-0" />
@@ -426,7 +425,7 @@ export default function App() {
               {view === 'archived' ? '보관함' : '전체 메모'}
               <span className="ml-1 font-normal" aria-live="polite">· {filteredNotes.length}개</span>
             </h2>
-            {selectedTags.map(tag => (
+            {activeTags.map(tag => (
               <span key={tag} className="inline-flex items-center gap-1 pl-3 pr-1 py-1 bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300 rounded-full text-xs font-semibold">
                 #{tag}
                 <button
@@ -439,7 +438,7 @@ export default function App() {
                 </button>
               </span>
             ))}
-            {selectedTags.length > 1 && (
+            {activeTags.length > 1 && (
               <button type="button" onClick={() => setSelectedTags([])} className="text-xs text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 underline-offset-2 hover:underline">
                 필터 모두 해제
               </button>
@@ -482,7 +481,7 @@ export default function App() {
                     key={note.id}
                     note={note}
                     query={searchTerm}
-                    selectedTags={selectedTags}
+                    selectedTags={activeTags}
                     onOpen={openEditModal}
                     onDelete={handleDeleteNote}
                     onTogglePin={togglePin}
