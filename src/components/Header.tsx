@@ -1,6 +1,8 @@
 import { type ChangeEvent, type RefObject, useRef } from 'react';
-import { Download, Layers, Monitor, Moon, Plus, Search, Sun, Upload } from 'lucide-react';
+import { Layers, Monitor, Moon, Plus, Search, Sun, Upload } from 'lucide-react';
 import type { ThemePref } from '../lib/theme';
+import type { ExportFormat } from '../hooks/useTransfer';
+import ExportMenu from './ExportMenu';
 
 const THEME_LABELS: Record<ThemePref, string> = { system: '시스템', light: '라이트', dark: '다크' };
 const THEME_ICONS = { system: Monitor, light: Sun, dark: Moon } as const;
@@ -12,7 +14,7 @@ type Props = {
   searchRef: RefObject<HTMLInputElement | null>;
   searchTerm: string;
   onSearchChange: (value: string) => void;
-  onExport: () => void;
+  onExport: (format: ExportFormat) => void;
   onFileChosen: (e: ChangeEvent<HTMLInputElement>) => void;
   themePref: ThemePref;
   onCycleTheme: () => void;
@@ -65,15 +67,7 @@ export default function Header({
         </div>
 
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={onExport}
-            aria-label="내보내기"
-            title="JSON으로 내보내기"
-            className={headerIconButton}
-          >
-            <Download size={18} />
-          </button>
+          <ExportMenu onExport={onExport} buttonClassName={headerIconButton} />
           <button
             type="button"
             onClick={e => {

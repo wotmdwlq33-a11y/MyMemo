@@ -1,3 +1,4 @@
+import { notesToMarkdown } from '../lib/markdown';
 import { type ChangeEvent, useCallback, useState } from 'react';
 import type { Note } from '../lib/notes';
 import { downloadText } from '../lib/download';
@@ -14,11 +15,18 @@ import type { SetToast } from './useToast';
 export type PendingImport = { fileName: string; notes: Note[]; skipped: number };
 
 /** JSON export, and import via a file picker followed by a confirm dialog. */
+/** Lossless JSON backup, or a readable Markdown document. */
+export type ExportFormat = 'json' | 'markdown';
+
 export function useTransfer(notes: Note[], setNotes: (notes: Note[]) => void, setToast: SetToast) {
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
 
-  const handleExport = () => {
-    downloadText(exportNotes(notes), exportFileName(), 'application/json');
+  const handleExport = (format: ExportFormat = 'json') => {
+    if (format === 'markdown') {
+      downloadText(notesToMarkdown(notes), exportFileName(new Date(), 'md'), 'text/markdown');
+    } else {
+      downloadText(exportNotes(notes), exportFileName(), 'application/json');
+    }
     setToast({ kind: 'info', text: `메모 ${notes.length}개를 내보냈습니다.` });
   };
 

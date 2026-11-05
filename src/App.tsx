@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef, useCallback, useDeferredValue } from 'react';
-import { AnimatePresence } from 'motion/react';
+import { AnimatePresence, MotionConfig } from 'motion/react';
 import { getBrowserStorage } from './lib/notes';
 import { type SortKey, type View, countTags, queryNotes } from './lib/search';
 import { loadSortPref, saveSortPref } from './lib/sortPref';
@@ -88,99 +88,102 @@ export default function App() {
   const isFiltering = searchTerm.trim() !== '' || activeTags.length > 0;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans selection:bg-indigo-100 selection:text-indigo-900">
-      <Header
-        searchRef={searchRef}
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        onExport={handleExport}
-        onFileChosen={handleFileChosen}
-        themePref={themePref}
-        onCycleTheme={cycleTheme}
-        onNewNote={editor.openNew}
-        returnFocusRef={returnFocusRef}
-      />
-
-      <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col md:flex-row gap-8">
-        <Sidebar
-          view={view}
-          activeCount={activeCount}
-          archivedCount={archivedCount}
-          tags={viewTags}
-          activeTags={activeTags}
-          hasAnyTags={knownTags.length > 0}
-          onSwitchView={switchView}
-          onToggleTag={toggleTag}
-          onOpenTagManager={e => {
-            returnFocusRef.current = e.currentTarget;
-            setIsTagManagerOpen(true);
-          }}
+    // Honour the OS "reduce motion" setting for transform/layout animations.
+    <MotionConfig reducedMotion="user">
+      <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans selection:bg-indigo-100 selection:text-indigo-900">
+        <Header
+          searchRef={searchRef}
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          onExport={handleExport}
+          onFileChosen={handleFileChosen}
+          themePref={themePref}
+          onCycleTheme={cycleTheme}
+          onNewNote={editor.openNew}
+          returnFocusRef={returnFocusRef}
         />
 
-        <main className="flex-1 min-w-0">
-          <CorruptDataBanner />
-          <ListToolbar
+        <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col md:flex-row gap-8">
+          <Sidebar
             view={view}
-            resultCount={filteredNotes.length}
+            activeCount={activeCount}
+            archivedCount={archivedCount}
+            tags={viewTags}
             activeTags={activeTags}
+            hasAnyTags={knownTags.length > 0}
+            onSwitchView={switchView}
             onToggleTag={toggleTag}
-            onClearTags={() => setSelectedTags([])}
-            sort={sort}
-            onSortChange={setSort}
-          />
-          <NoteList
-            notes={filteredNotes}
-            queryKey={queryKey}
-            query={deferredSearch}
-            selectedTags={activeTags}
-            view={view}
-            isFiltering={isFiltering}
-            onOpen={editor.openEdit}
-            onDelete={deleteNote}
-            onTogglePin={togglePin}
-            onToggleArchive={toggleArchive}
-            onTagClick={toggleTag}
-          />
-        </main>
-      </div>
-
-      <ToastRegion toast={toast} onDismiss={() => setToast(null)} />
-
-      <AnimatePresence>
-        {isTagManagerOpen && (
-          <TagManagerDialog
-            tags={allTagCounts}
-            onRename={(from, to) => {
-              renameTag(from, to);
-              setSelectedTags(prev => [...new Set(prev.map(t => (t === from ? to.trim() : t)))]);
+            onOpenTagManager={e => {
+              returnFocusRef.current = e.currentTarget;
+              setIsTagManagerOpen(true);
             }}
-            onDelete={deleteTag}
-            onClose={closeTagManager}
-            returnFocusTo={returnFocusRef}
           />
-        )}
-      </AnimatePresence>
 
-      <AnimatePresence>
-        {pendingImport && (
-          <ImportDialog
-            fileName={pendingImport.fileName}
-            notes={pendingImport.notes}
-            skipped={pendingImport.skipped}
-            existingCount={notes.length}
-            onConfirm={confirmImport}
-            onCancel={cancelImport}
-            returnFocusTo={returnFocusRef}
-          />
-        )}
-      </AnimatePresence>
+          <main className="flex-1 min-w-0">
+            <CorruptDataBanner />
+            <ListToolbar
+              view={view}
+              resultCount={filteredNotes.length}
+              activeTags={activeTags}
+              onToggleTag={toggleTag}
+              onClearTags={() => setSelectedTags([])}
+              sort={sort}
+              onSortChange={setSort}
+            />
+            <NoteList
+              notes={filteredNotes}
+              queryKey={queryKey}
+              query={deferredSearch}
+              selectedTags={activeTags}
+              view={view}
+              isFiltering={isFiltering}
+              onOpen={editor.openEdit}
+              onDelete={deleteNote}
+              onTogglePin={togglePin}
+              onToggleArchive={toggleArchive}
+              onTagClick={toggleTag}
+            />
+          </main>
+        </div>
 
-      <NoteEditorDialog
-        editor={editor}
-        editingNote={editingNote}
-        knownTags={knownTags}
-        returnFocusRef={returnFocusRef}
-      />
-    </div>
+        <ToastRegion toast={toast} onDismiss={() => setToast(null)} />
+
+        <AnimatePresence>
+          {isTagManagerOpen && (
+            <TagManagerDialog
+              tags={allTagCounts}
+              onRename={(from, to) => {
+                renameTag(from, to);
+                setSelectedTags(prev => [...new Set(prev.map(t => (t === from ? to.trim() : t)))]);
+              }}
+              onDelete={deleteTag}
+              onClose={closeTagManager}
+              returnFocusTo={returnFocusRef}
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {pendingImport && (
+            <ImportDialog
+              fileName={pendingImport.fileName}
+              notes={pendingImport.notes}
+              skipped={pendingImport.skipped}
+              existingCount={notes.length}
+              onConfirm={confirmImport}
+              onCancel={cancelImport}
+              returnFocusTo={returnFocusRef}
+            />
+          )}
+        </AnimatePresence>
+
+        <NoteEditorDialog
+          editor={editor}
+          editingNote={editingNote}
+          knownTags={knownTags}
+          returnFocusRef={returnFocusRef}
+        />
+      </div>
+    </MotionConfig>
   );
 }

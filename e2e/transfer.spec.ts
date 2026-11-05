@@ -14,6 +14,7 @@ test('exports all notes as a JSON file', async ({ page }) => {
 
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: '내보내기' }).click();
+  await page.getByRole('menuitem', { name: /JSON 백업/ }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^mymemo-\d{4}-\d{2}-\d{2}\.json$/);
 
@@ -23,6 +24,40 @@ test('exports all notes as a JSON file', async ({ page }) => {
     expect.arrayContaining(['내보낼 메모', ...SEED_TITLES]),
   );
   await expect(page.getByRole('status')).toContainText('내보냈습니다');
+});
+
+test('exports a readable Markdown document from the keyboard', async ({ page }) => {
+  await gotoApp(page);
+  const button = page.getByRole('button', { name: '내보내기' });
+  await button.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('menuitem', { name: /JSON 백업/ })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('menuitem', { name: /Markdown/ })).toBeFocused();
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.keyboard.press('Enter');
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^mymemo-\d{4}-\d{2}-\d{2}\.md$/);
+  const md = await readFile(await download.path(), 'utf8');
+  expect(md).toContain('## 프로젝트 아이디어');
+  expect(md).toContain('#업무 #개발');
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(button).toBeFocused();
+});
+
+test('export menu closes with Escape and outside clicks', async ({ page }) => {
+  await gotoApp(page);
+  const button = page.getByRole('button', { name: '내보내기' });
+  await button.click();
+  await expect(page.getByRole('menu')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(button).toBeFocused();
+
+  await button.click();
+  await page.getByRole('heading', { name: /전체 메모/ }).click();
+  await expect(page.getByRole('menu')).toHaveCount(0);
 });
 
 test('merges imported notes with existing ones', async ({ page }) => {

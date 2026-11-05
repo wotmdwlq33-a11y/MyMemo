@@ -35,9 +35,9 @@ export function exportNotes(notes: Note[], now: Date = new Date()): string {
 }
 
 /** File name like `mymemo-2026-11-05.json` (local date). */
-export function exportFileName(now: Date = new Date()): string {
+export function exportFileName(now: Date = new Date(), extension: 'json' | 'md' = 'json'): string {
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `mymemo-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.json`;
+  return `mymemo-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.${extension}`;
 }
 
 /**
