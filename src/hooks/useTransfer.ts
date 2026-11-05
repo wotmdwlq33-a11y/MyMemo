@@ -63,6 +63,7 @@ export function useTransfer(notes: Note[], setNotes: (notes: Note[]) => void, se
     ) {
       return;
     }
+    const before = notes;
     const result = applyImport(notes, pendingImport.notes, mode);
     setNotes(result.notes);
     setPendingImport(null);
@@ -72,6 +73,14 @@ export function useTransfer(notes: Note[], setNotes: (notes: Note[]) => void, se
         mode === 'replace'
           ? `메모 ${result.added}개로 바꿨습니다.`
           : `가져오기 완료: ${result.added}개 추가, ${result.updated}개 갱신, ${result.unchanged}개 유지`,
+      // Importing (especially replacing) is the riskiest action in the app.
+      action: {
+        label: '실행 취소',
+        run: () => {
+          setNotes(before);
+          setToast({ kind: 'info', text: '가져오기를 취소했습니다.' });
+        },
+      },
     });
   };
 

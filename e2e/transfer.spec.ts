@@ -121,6 +121,19 @@ test('keeps both notes when an imported note shares an id with an unrelated loca
   expect(new Set(ids).size).toBe(4);
 });
 
+test('an import can be undone from the toast', async ({ page }) => {
+  await gotoApp(page);
+  await page.getByTestId('import-input').setInputFiles(importFile([{ id: 7, title: '유일한 메모' }]));
+  page.once('dialog', d => d.accept());
+  await page.getByRole('dialog', { name: '메모 가져오기' }).getByRole('button', { name: '모두 바꾸기' }).click();
+  await expect(noteCard(page, '유일한 메모')).toBeVisible();
+
+  await page.getByRole('button', { name: '실행 취소' }).click();
+  for (const title of SEED_TITLES) await expect(noteCard(page, title)).toBeVisible();
+  await expect(noteCard(page, '유일한 메모')).toHaveCount(0);
+  expect((await readStoredNotes(page)).map(n => n.title).sort()).toEqual([...SEED_TITLES].sort());
+});
+
 test('replaces all notes after confirmation', async ({ page }) => {
   await gotoApp(page);
   await page.getByTestId('import-input').setInputFiles(importFile([{ id: 7, title: '유일한 메모' }]));
