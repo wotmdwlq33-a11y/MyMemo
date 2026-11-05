@@ -57,6 +57,8 @@ export default function App() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [tagsInput, setTagsInput] = useState('');
+  // null = creating a new note; otherwise the id of the note being edited
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   // Single source of persistence: every change to `notes` (including the
   // initial seed and deleting the last note) is written to storage here.
@@ -87,24 +89,47 @@ export default function App() {
     }).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   }, [notes, searchTerm, selectedTag]);
 
-  const handleAddNote = () => {
+  const openNewModal = () => {
+    setEditingId(null);
+    setTitle('');
+    setBody('');
+    setTagsInput('');
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (note: Note) => {
+    setEditingId(note.id);
+    setTitle(note.title);
+    setBody(note.body);
+    setTagsInput(note.tags.join(', '));
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingId(null);
+    setTitle('');
+    setBody('');
+    setTagsInput('');
+  };
+
+  const handleSaveNote = () => {
     if (!title.trim()) return;
 
-    const newNote: Note = {
-      id: Date.now(),
+    const fields = {
       title: title.trim(),
       body: body.trim(),
       tags: parseTags(tagsInput),
       updatedAt: new Date().toISOString(),
     };
 
-    setNotes(prev => [newNote, ...prev]);
-    
-    // Reset and close
-    setTitle('');
-    setBody('');
-    setTagsInput('');
-    setIsModalOpen(false);
+    if (editingId === null) {
+      setNotes(prev => [{ id: Date.now(), ...fields }, ...prev]);
+    } else {
+      setNotes(prev => prev.map(n => (n.id === editingId ? { ...n, ...fields } : n)));
+    }
+
+    closeModal();
   };
 
   const handleDeleteNote = (id: number) => {
@@ -139,7 +164,7 @@ export default function App() {
           </div>
 
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={openNewModal}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-full font-medium transition-colors shadow-lg shadow-indigo-200"
           >
             <Plus size={18} />
@@ -200,11 +225,11 @@ export default function App() {
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.9 }}
-                    className="group relative bg-white border border-slate-200 rounded-2xl p-5 hover:shadow-xl hover:shadow-slate-200/50 hover:border-indigo-100 transition-all cursor-default"
+                    className="group relative bg-white border border-slate-200 rounded-2xl p-5 hover:shadow-xl hover:shadow-slate-200/50 hover:border-indigo-100 focus-within:border-indigo-300 transition-all cursor-pointer"
                   >
                     <button 
                       onClick={() => handleDeleteNote(note.id)}
-                      className="absolute top-4 right-4 p-2 text-slate-300 hover:text-rose-500 bg-slate-50 hover:bg-rose-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                      className="absolute z-10 top-4 right-4 p-2 text-slate-300 hover:text-rose-500 bg-slate-50 hover:bg-rose-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -215,7 +240,14 @@ export default function App() {
                     </div>
 
                     <h3 className="font-bold text-lg mb-2 text-slate-800 line-clamp-1 group-hover:text-indigo-600 transition-colors">
-                      {note.title}
+                      {/* Stretched button: the whole card opens the editor. */}
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(note)}
+                        className="text-left after:absolute after:inset-0 after:rounded-2xl focus:outline-none"
+                      >
+                        {note.title}
+                      </button>
                     </h3>
                     
                     <p className="text-slate-600 text-sm leading-relaxed mb-4 line-clamp-3">
@@ -237,7 +269,7 @@ export default function App() {
         </main>
       </div>
 
-      {/* New Note Modal */}
+      {/* New / Edit Note Modal */}
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -245,7 +277,7 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsModalOpen(false)}
+              onClick={closeModal}
               className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
             />
             
@@ -257,9 +289,11 @@ export default function App() {
             >
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-slate-800 tracking-tight">새로운 메모 작성</h2>
+                  <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
+                    {editingId === null ? '새로운 메모 작성' : '메모 수정'}
+                  </h2>
                   <button 
-                    onClick={() => setIsModalOpen(false)}
+                    onClick={closeModal}
                     className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
                   >
                     <X size={20} />
@@ -306,13 +340,13 @@ export default function App() {
 
                 <div className="mt-8 flex gap-3">
                   <button 
-                    onClick={() => setIsModalOpen(false)}
+                    onClick={closeModal}
                     className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-colors"
                   >
                     취소
                   </button>
                   <button 
-                    onClick={handleAddNote}
+                    onClick={handleSaveNote}
                     disabled={!title.trim()}
                     className="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 text-white font-semibold rounded-xl transition-colors shadow-lg shadow-indigo-200 flex items-center justify-center gap-2"
                   >
