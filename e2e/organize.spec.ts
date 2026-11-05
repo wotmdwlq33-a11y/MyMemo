@@ -38,7 +38,7 @@ test('tag chips combine filters and can be removed', async ({ page }) => {
 
   await page.getByRole('navigation', { name: '메모 분류' }).getByRole('button', { name: /^디자인/ }).click();
   await expect(page.getByTestId('note-card')).toHaveCount(2);
-  await page.getByRole('button', { name: '태그 회고로 필터' }).click();
+  await page.getByTestId('note-card').getByRole('button', { name: '#회고', exact: true }).click();
   await expect(page.getByTestId('note-card')).toHaveCount(1);
   await expect(noteCard(page, '디자인 회고')).toBeVisible();
 

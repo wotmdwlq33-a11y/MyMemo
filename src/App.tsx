@@ -564,11 +564,11 @@ export default function App() {
             </button>
 
             <div className="pt-4 pb-2 px-4">
-              <h2 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">태그 목록</h2>
+              <h2 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">태그 목록</h2>
             </div>
 
             {allTags.length === 0 && (
-              <p className="px-4 text-xs text-slate-400 dark:text-slate-500">태그가 없습니다.</p>
+              <p className="px-4 text-xs text-slate-500 dark:text-slate-400">태그가 없습니다.</p>
             )}
             {/* On small screens the tag list scrolls horizontally instead of pushing notes down. */}
             <div className="flex md:block gap-2 md:space-y-1 overflow-x-auto md:overflow-visible -mx-4 px-4 md:mx-0 md:px-0 pb-1 md:pb-0">
@@ -648,7 +648,7 @@ export default function App() {
           </div>
 
           {filteredNotes.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800 rounded-3xl">
+            <div className="flex flex-col items-center justify-center py-20 text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800 rounded-3xl">
               {view === 'archived' && !isFiltering ? (
                 <>
                   <Archive size={48} className="mb-4 opacity-20" />

@@ -73,7 +73,7 @@ const NoteCard = forwardRef<HTMLDivElement, Props>(function NoteCard(
         </button>
       </div>
 
-      <div className="flex items-center gap-2 text-xs font-medium text-slate-400 dark:text-slate-500 mb-3 pr-28">
+      <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400 mb-3 pr-28">
         {note.pinned && (
           <span className="text-indigo-600 dark:text-indigo-400">고정됨 ·</span>
         )}
@@ -106,7 +106,7 @@ const NoteCard = forwardRef<HTMLDivElement, Props>(function NoteCard(
                 key={tag}
                 onClick={() => onTagClick(tag)}
                 aria-pressed={active}
-                aria-label={`태그 ${tag}로 필터`}
+                title={active ? '태그 필터 해제' : '이 태그로 필터'}
                 className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors ${
                   active
                     ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300'

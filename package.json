@@ -23,6 +23,7 @@
     "vite": "^6.2.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@eslint/js": "^9.39.5",
     "@playwright/test": "1.63.0",
     "@types/node": "^22.14.0",
