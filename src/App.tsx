@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useId } from 'react';
 import { 
   Plus, 
   Search, 
@@ -15,16 +15,13 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-
-type Note = {
-  id: number;
-  title: string;
-  body: string;
-  tags: string[];
-  updatedAt: string;
-};
-
-const STORAGE_KEY = 'mymemo.notes';
+import {
+  type Note,
+  getBrowserStorage,
+  loadNotes,
+  parseTags,
+  saveNotes,
+} from './lib/notes';
 
 const SEED_DATA: Note[] = [
   {
@@ -51,7 +48,7 @@ const SEED_DATA: Note[] = [
 ];
 
 export default function App() {
-  const [notes, setNotes] = useState<Note[]>([]);
+  const [notes, setNotes] = useState<Note[]>(() => loadNotes(getBrowserStorage(), SEED_DATA));
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
@@ -60,24 +57,25 @@ export default function App() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [tagsInput, setTagsInput] = useState('');
+  // null = creating a new note; otherwise the id of the note being edited
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const fieldId = useId();
 
-  // Initial load
+  // Single source of persistence: every change to `notes` (including the
+  // initial seed and deleting the last note) is written to storage here.
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      setNotes(JSON.parse(saved));
-    } else {
-      setNotes(SEED_DATA);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_DATA));
-    }
-  }, []);
-
-  // Save changes
-  useEffect(() => {
-    if (notes.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
-    }
+    saveNotes(getBrowserStorage(), notes);
   }, [notes]);
+
+  // Close the modal with Escape.
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeModal();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isModalOpen]);
 
   const allTags = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -102,33 +100,52 @@ export default function App() {
     }).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   }, [notes, searchTerm, selectedTag]);
 
-  const handleAddNote = () => {
-    if (!title.trim()) return;
-
-    const newNote: Note = {
-      id: Date.now(),
-      title: title.trim(),
-      body: body.trim(),
-      tags: tagsInput.split(',').map(t => t.trim()).filter(Boolean),
-      updatedAt: new Date().toISOString(),
-    };
-
-    const updatedNotes = [newNote, ...notes];
-    setNotes(updatedNotes);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedNotes));
-    
-    // Reset and close
+  const openNewModal = () => {
+    setEditingId(null);
     setTitle('');
     setBody('');
     setTagsInput('');
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (note: Note) => {
+    setEditingId(note.id);
+    setTitle(note.title);
+    setBody(note.body);
+    setTagsInput(note.tags.join(', '));
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
     setIsModalOpen(false);
+    setEditingId(null);
+    setTitle('');
+    setBody('');
+    setTagsInput('');
+  };
+
+  const handleSaveNote = () => {
+    if (!title.trim()) return;
+
+    const fields = {
+      title: title.trim(),
+      body: body.trim(),
+      tags: parseTags(tagsInput),
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (editingId === null) {
+      setNotes(prev => [{ id: Date.now(), ...fields }, ...prev]);
+    } else {
+      setNotes(prev => prev.map(n => (n.id === editingId ? { ...n, ...fields } : n)));
+    }
+
+    closeModal();
   };
 
   const handleDeleteNote = (id: number) => {
     if (window.confirm('정말 이 메모를 삭제할까요?')) {
-      const updatedNotes = notes.filter(n => n.id !== id);
-      setNotes(updatedNotes);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedNotes));
+      setNotes(prev => prev.filter(n => n.id !== id));
     }
   };
 
@@ -149,7 +166,8 @@ export default function App() {
           <div className="flex-1 max-w-md relative group">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={18} />
             <input 
-              type="text" 
+              type="search" 
+              aria-label="메모 검색"
               placeholder="메모 검색..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -158,7 +176,8 @@ export default function App() {
           </div>
 
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={openNewModal}
+            aria-label="새 메모"
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-full font-medium transition-colors shadow-lg shadow-indigo-200"
           >
             <Plus size={18} />
@@ -173,6 +192,7 @@ export default function App() {
           <nav className="space-y-1">
             <button 
               onClick={() => setSelectedTag(null)}
+              aria-pressed={!selectedTag}
               className={`w-full flex items-center justify-between px-4 py-2 rounded-lg text-sm font-medium transition-colors ${!selectedTag ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100'}`}
             >
               <div className="flex items-center gap-2">
@@ -190,6 +210,7 @@ export default function App() {
               <button 
                 key={tag}
                 onClick={() => setSelectedTag(tag === selectedTag ? null : tag)}
+                aria-pressed={selectedTag === tag}
                 className={`w-full flex items-center justify-between px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedTag === tag ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100'}`}
               >
                 <div className="flex items-center gap-2">
@@ -219,11 +240,13 @@ export default function App() {
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.9 }}
-                    className="group relative bg-white border border-slate-200 rounded-2xl p-5 hover:shadow-xl hover:shadow-slate-200/50 hover:border-indigo-100 transition-all cursor-default"
+                    className="group relative bg-white border border-slate-200 rounded-2xl p-5 hover:shadow-xl hover:shadow-slate-200/50 hover:border-indigo-100 focus-within:border-indigo-300 transition-all cursor-pointer"
                   >
                     <button 
+                      type="button"
                       onClick={() => handleDeleteNote(note.id)}
-                      className="absolute top-4 right-4 p-2 text-slate-300 hover:text-rose-500 bg-slate-50 hover:bg-rose-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                      aria-label={`'${note.title}' 메모 삭제`}
+                      className="absolute z-10 top-4 right-4 p-2 text-slate-400 hover:text-rose-500 bg-slate-50 hover:bg-rose-50 rounded-lg transition-all focus-visible:outline-2 focus-visible:outline-rose-500 opacity-100 pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -234,7 +257,14 @@ export default function App() {
                     </div>
 
                     <h3 className="font-bold text-lg mb-2 text-slate-800 line-clamp-1 group-hover:text-indigo-600 transition-colors">
-                      {note.title}
+                      {/* Stretched button: the whole card opens the editor. */}
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(note)}
+                        className="text-left after:absolute after:inset-0 after:rounded-2xl focus:outline-none"
+                      >
+                        {note.title}
+                      </button>
                     </h3>
                     
                     <p className="text-slate-600 text-sm leading-relaxed mb-4 line-clamp-3">
@@ -256,7 +286,7 @@ export default function App() {
         </main>
       </div>
 
-      {/* New Note Modal */}
+      {/* New / Edit Note Modal */}
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -264,11 +294,14 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsModalOpen(false)}
+              onClick={closeModal}
               className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
             />
             
             <motion.div 
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={`${fieldId}-heading`}
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -276,9 +309,13 @@ export default function App() {
             >
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-slate-800 tracking-tight">새로운 메모 작성</h2>
+                  <h2 id={`${fieldId}-heading`} className="text-2xl font-bold text-slate-800 tracking-tight">
+                    {editingId === null ? '새로운 메모 작성' : '메모 수정'}
+                  </h2>
                   <button 
-                    onClick={() => setIsModalOpen(false)}
+                    type="button"
+                    onClick={closeModal}
+                    aria-label="닫기"
                     className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
                   >
                     <X size={20} />
@@ -287,9 +324,12 @@ export default function App() {
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">제목</label>
+                    <label htmlFor={`${fieldId}-title`} className="block text-sm font-semibold text-slate-700 mb-1">제목</label>
                     <input 
+                      id={`${fieldId}-title`}
                       type="text" 
+                      autoFocus
+                      required
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       placeholder="메모의 제목을 입력하세요"
@@ -298,8 +338,9 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">본문</label>
+                    <label htmlFor={`${fieldId}-body`} className="block text-sm font-semibold text-slate-700 mb-1">본문</label>
                     <textarea 
+                      id={`${fieldId}-body`}
                       rows={4}
                       value={body}
                       onChange={(e) => setBody(e.target.value)}
@@ -309,10 +350,11 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">태그 (쉼표로 구분)</label>
+                    <label htmlFor={`${fieldId}-tags`} className="block text-sm font-semibold text-slate-700 mb-1">태그 (쉼표로 구분)</label>
                     <div className="relative group">
                       <TagIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500" size={16} />
                       <input 
+                        id={`${fieldId}-tags`}
                         type="text" 
                         value={tagsInput}
                         onChange={(e) => setTagsInput(e.target.value)}
@@ -325,13 +367,13 @@ export default function App() {
 
                 <div className="mt-8 flex gap-3">
                   <button 
-                    onClick={() => setIsModalOpen(false)}
+                    onClick={closeModal}
                     className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-colors"
                   >
                     취소
                   </button>
                   <button 
-                    onClick={handleAddNote}
+                    onClick={handleSaveNote}
                     disabled={!title.trim()}
                     className="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 text-white font-semibold rounded-xl transition-colors shadow-lg shadow-indigo-200 flex items-center justify-center gap-2"
                   >
