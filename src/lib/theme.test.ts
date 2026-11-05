@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { THEME_KEY, loadThemePref, nextThemePref, resolveTheme, saveThemePref } from './theme';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { THEME_KEY, loadThemePref, nextThemePref, resolveTheme, saveThemePref, systemPrefersDark } from './theme';
 
 const mem = (init: Record<string, string> = {}) => {
   const d = new Map(Object.entries(init));
@@ -31,5 +31,21 @@ describe('theme preference', () => {
     expect(nextThemePref('system')).toBe('light');
     expect(nextThemePref('light')).toBe('dark');
     expect(nextThemePref('dark')).toBe('system');
+  });
+});
+
+describe('systemPrefersDark', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('is false without window.matchMedia', () => {
+    vi.stubGlobal('window', {});
+    expect(systemPrefersDark()).toBe(false);
+  });
+
+  it('reads the prefers-color-scheme media query', () => {
+    const queries: string[] = [];
+    vi.stubGlobal('window', { matchMedia: (q: string) => (queries.push(q), { matches: true }) });
+    expect(systemPrefersDark()).toBe(true);
+    expect(queries).toEqual(['(prefers-color-scheme: dark)']);
   });
 });

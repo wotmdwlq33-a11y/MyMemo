@@ -25,7 +25,7 @@ export default defineConfig({
       // Phone-sized smoke run of the core flows and accessibility checks.
       name: 'mobile',
       use: { ...devices['Pixel 7'] },
-      testMatch: ['notes.spec.ts', 'transfer.spec.ts'],
+      testMatch: ['notes.spec.ts', 'a11y.spec.ts', 'transfer.spec.ts'],
     },
   ],
   webServer: {

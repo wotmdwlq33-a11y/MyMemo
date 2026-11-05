@@ -42,3 +42,10 @@ export function applyTheme(root: HTMLElement, theme: 'light' | 'dark'): void {
     meta.setAttribute('content', THEME_COLORS[theme]);
   });
 }
+
+/** Whether the OS currently prefers a dark color scheme (false outside a browser). */
+export function systemPrefersDark(): boolean {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-color-scheme: dark)').matches
+    : false;
+}

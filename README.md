@@ -62,8 +62,10 @@ e2e 테스트를 처음 실행할 때는 브라우저가 필요합니다: `npx p
 
 ```
 src/
-  App.tsx                    화면 상태와 메모 추가/수정/삭제/가져오기 로직
-  components/                NoteCard, ImportDialog, TagManagerDialog, UpdatePrompt, Highlight
+  App.tsx                    훅과 컴포넌트를 연결하는 최상위 화면
+  hooks/                     useNotes, useNoteEditor, useTransfer, useTheme, useToast, useGlobalShortcuts
+  components/                Header, Sidebar, ListToolbar, NoteList, NoteCard, NoteEditorDialog,
+                             ImportDialog, TagManagerDialog, Toast, CorruptDataBanner, UpdatePrompt, Highlight
   ErrorBoundary.tsx          렌더링 오류 시 안내 화면
   lib/notes.ts               localStorage 읽기/쓰기, 메모 검증·태그 정리
   lib/search.ts              필터 · 정렬 · 검색어 강조
