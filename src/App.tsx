@@ -43,6 +43,7 @@ import {
   saveThemePref,
 } from './lib/theme';
 import { useFocusTrap } from './lib/useFocusTrap';
+import { applyTagSuggestion, suggestTags } from './lib/tagSuggest';
 import NoteCard from './components/NoteCard';
 import ImportDialog from './components/ImportDialog';
 
@@ -83,6 +84,10 @@ function loadSort(): SortKey {
   } catch {
     return 'updated';
   }
+}
+
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 /** Trigger a browser download of `text`. */
@@ -282,6 +287,12 @@ export default function App() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [isModalOpen]);
+
+  // Every tag in use (most frequent first), for suggestions in the editor.
+  const knownTags = useMemo(() => countTags(notes).map(([tag]) => tag), [notes]);
+  const tagSuggestions = isModalOpen ? suggestTags(knownTags, tagsInput) : [];
+  const tagsFieldRef = useRef<HTMLInputElement>(null);
+  const editingNote = editingId === null ? undefined : notes.find(n => n.id === editingId);
 
   const activeCount = useMemo(() => notes.filter(n => !n.archived).length, [notes]);
   const archivedCount = notes.length - activeCount;
@@ -819,15 +830,41 @@ export default function App() {
                     <div className="relative group">
                       <TagIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500" size={16} />
                       <input
+                        ref={tagsFieldRef}
                         id={`${fieldId}-tags`}
                         type="text"
                         value={tagsInput}
                         onChange={(e) => setTagsInput(e.target.value)}
                         placeholder="예: 업무, 중요, 프로젝트"
+                        aria-describedby={tagSuggestions.length > 0 ? `${fieldId}-tag-suggestions` : undefined}
                         className={`${fieldClass} pl-10`}
                       />
                     </div>
+                    {tagSuggestions.length > 0 && (
+                      <div id={`${fieldId}-tag-suggestions`} className="mt-2 flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs text-slate-500 dark:text-slate-400 mr-1">기존 태그:</span>
+                        {tagSuggestions.map(tag => (
+                          <button
+                            type="button"
+                            key={tag}
+                            onClick={() => {
+                              setTagsInput(applyTagSuggestion(tagsInput, tag));
+                              tagsFieldRef.current?.focus();
+                            }}
+                            title={`태그 ${tag} 추가`}
+                            className="px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-300 transition-colors"
+                          >
+                            +{tag}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
+                  {editingNote && (
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      작성 {formatDateTime(editingNote.createdAt)} · 수정 {formatDateTime(editingNote.updatedAt)}
+                    </p>
+                  )}
                 </div>
 
                 <div className="mt-8 flex gap-3">

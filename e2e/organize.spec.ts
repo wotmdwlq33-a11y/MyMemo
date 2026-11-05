@@ -105,3 +105,21 @@ test('focus stays inside the note dialog and returns to the opener', async ({ pa
   await expect(dialog).toBeHidden();
   await expect(opener).toBeFocused();
 });
+
+test('suggests existing tags while typing and shows dates when editing', async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole('button', { name: '새 메모' }).click();
+  const dialog = page.getByRole('dialog');
+  const tags = dialog.getByLabel('태그 (쉼표로 구분)');
+  await tags.fill('업무, 개');
+  await expect(dialog.getByRole('button', { name: '+개발' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '+업무' })).toHaveCount(0);
+  await dialog.getByRole('button', { name: '+개발' }).click();
+  await expect(tags).toHaveValue('업무, 개발, ');
+  await expect(tags).toBeFocused();
+  await dialog.getByRole('button', { name: '취소' }).click();
+
+  await noteCard(page, '프로젝트 아이디어').click();
+  await expect(page.getByRole('dialog')).toContainText('작성');
+  await expect(page.getByRole('dialog')).toContainText('수정');
+});
