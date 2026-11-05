@@ -4,6 +4,7 @@ import {
   STORAGE_KEY,
   type Note,
   loadNotes,
+  nextNoteId,
   normalizeTags,
   parseTags,
   saveNotes,
@@ -148,5 +149,18 @@ describe('saveNotes', () => {
     };
     expect(saveNotes(full, [note()])).toBe(false);
     expect(saveNotes(null, [note()])).toBe(false);
+  });
+});
+
+describe('nextNoteId', () => {
+  it('uses the clock unless an existing id is at or beyond it', () => {
+    expect(nextNoteId([note({ id: 5 })], 100)).toBe(100);
+    expect(nextNoteId([note({ id: 100 })], 100)).toBe(101);
+    expect(nextNoteId([], 7)).toBe(7);
+  });
+
+  it('handles very large lists without overflowing the stack', () => {
+    const many = Array.from({ length: 300_000 }, (_, i) => ({ id: i + 1 }) as Note);
+    expect(nextNoteId(many, 0)).toBe(300_001);
   });
 });

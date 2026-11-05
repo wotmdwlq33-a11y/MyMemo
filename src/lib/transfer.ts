@@ -1,4 +1,4 @@
-import { type Note, toNote } from './notes';
+import { type Note, nextNoteId, toNote } from './notes';
 
 export const EXPORT_FORMAT = 'mymemo';
 export const EXPORT_VERSION = 1;
@@ -95,8 +95,14 @@ function sameContent(a: Note, b: Note): boolean {
 /**
  * Combine imported notes with the existing ones.
  * - replace: the imported list becomes the whole list.
- * - merge: notes with a new id are added; for an id that already exists the
- *   version with the later `updatedAt` wins (ties keep the existing note).
+ * - merge: notes with a new id are added. When an id already exists:
+ *   - same `createdAt` → it is the same note; the later `updatedAt` wins
+ *     (ties keep the existing note);
+ *   - different `createdAt` → two unrelated notes happen to share an id (e.g.
+ *     the sample notes created on each device), so the imported one is added
+ *     under a fresh id instead of being dropped.
+ *   Notes deleted locally but present in the file come back (there is no
+ *   deletion history).
  */
 export function applyImport(existing: Note[], incoming: Note[], mode: ImportMode): MergeSummary {
   if (mode === 'replace') {
@@ -104,12 +110,17 @@ export function applyImport(existing: Note[], incoming: Note[], mode: ImportMode
   }
 
   const incomingById = new Map(incoming.map(n => [n.id, n]));
+  const conflicting: Note[] = [];
   let updated = 0;
   let unchanged = 0;
   const merged = existing.map(current => {
     const other = incomingById.get(current.id);
     if (!other) return current;
     incomingById.delete(current.id);
+    if (Date.parse(other.createdAt) !== Date.parse(current.createdAt)) {
+      conflicting.push(other);
+      return current;
+    }
     if (Date.parse(other.updatedAt) > Date.parse(current.updatedAt) && !sameContent(current, other)) {
       updated++;
       return other;
@@ -118,5 +129,8 @@ export function applyImport(existing: Note[], incoming: Note[], mode: ImportMode
     return current;
   });
   const added = [...incomingById.values()];
+  // Re-number conflicting notes after everything else so new ids are unique.
+  let id = nextNoteId([...added, ...merged], 0);
+  for (const note of conflicting) added.push({ ...note, id: id++ });
   return { notes: [...added, ...merged], added: added.length, updated, unchanged };
 }

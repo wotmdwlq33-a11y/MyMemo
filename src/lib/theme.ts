@@ -29,8 +29,16 @@ export function nextThemePref(pref: ThemePref): ThemePref {
   return THEME_ORDER[(THEME_ORDER.indexOf(pref) + 1) % THEME_ORDER.length];
 }
 
-/** Toggle the `dark` class and color-scheme on <html>. */
+export const THEME_COLORS = { light: '#4f46e5', dark: '#1e1b4b' } as const;
+
+/**
+ * Toggle the `dark` class and color-scheme on <html>, and point the browser UI
+ * color (<meta name="theme-color">) at the chosen theme rather than the OS one.
+ */
 export function applyTheme(root: HTMLElement, theme: 'light' | 'dark'): void {
   root.classList.toggle('dark', theme === 'dark');
   root.style.colorScheme = theme;
+  root.ownerDocument.querySelectorAll('meta[name="theme-color"]').forEach(meta => {
+    meta.setAttribute('content', THEME_COLORS[theme]);
+  });
 }

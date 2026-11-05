@@ -76,3 +76,32 @@ test('theme follows the system and can be toggled', async ({ page }) => {
   await page.reload();
   await expect(html).toHaveClass(/dark/); // explicit choice wins over the system
 });
+
+test('keyboard shortcuts: "/" focuses search and "n" opens a new note', async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press('/');
+  await expect(searchInput(page)).toBeFocused();
+  await searchInput(page).press('n'); // typing in the field must not open the dialog
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  await searchInput(page).blur();
+  await page.keyboard.press('n');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByRole('dialog').getByLabel('제목')).toBeFocused();
+});
+
+test('focus stays inside the note dialog and returns to the opener', async ({ page }) => {
+  await gotoApp(page);
+  const opener = page.getByRole('button', { name: '새 메모' });
+  await opener.click();
+  const dialog = page.getByRole('dialog');
+  for (let i = 0; i < 8; i++) {
+    await page.keyboard.press('Tab');
+    expect(await dialog.evaluate(el => el.contains(document.activeElement))).toBe(true);
+  }
+  await page.keyboard.press('Shift+Tab');
+  expect(await dialog.evaluate(el => el.contains(document.activeElement))).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(opener).toBeFocused();
+});

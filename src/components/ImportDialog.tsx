@@ -1,4 +1,5 @@
-import { useEffect, useId } from 'react';
+import { type RefObject, useEffect, useId, useRef } from 'react';
+import { useFocusTrap } from '../lib/useFocusTrap';
 import { motion } from 'motion/react';
 import { Upload, X } from 'lucide-react';
 import type { Note } from '../lib/notes';
@@ -11,14 +12,18 @@ type Props = {
   existingCount: number;
   onConfirm: (mode: ImportMode) => void;
   onCancel: () => void;
+  /** Element to focus again when the dialog closes. */
+  returnFocusTo?: RefObject<HTMLElement | null>;
 };
 
 /** Ask whether imported notes should be merged into or replace the current list. */
-export default function ImportDialog({ fileName, notes, skipped, existingCount, onConfirm, onCancel }: Props) {
+export default function ImportDialog({ fileName, notes, skipped, existingCount, onConfirm, onCancel, returnFocusTo }: Props) {
   const id = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, true, returnFocusTo);
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
+      if (e.key === 'Escape' && !e.isComposing) onCancel();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -34,6 +39,7 @@ export default function ImportDialog({ fileName, notes, skipped, existingCount, 
         className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm"
       />
       <motion.div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${id}-heading`}

@@ -24,11 +24,12 @@ import {
   type Note,
   getBrowserStorage,
   loadNotes,
+  nextNoteId,
   parseTags,
   saveNotes,
 } from './lib/notes';
 import { type SortKey, type View, SORT_LABELS, countTags, queryNotes } from './lib/search';
-import { type ImportMode, applyImport, exportFileName, exportNotes, parseImport } from './lib/transfer';
+import { type ImportMode, MAX_IMPORT_BYTES, applyImport, exportFileName, exportNotes, parseImport } from './lib/transfer';
 import {
   type ThemePref,
   applyTheme,
@@ -37,6 +38,7 @@ import {
   resolveTheme,
   saveThemePref,
 } from './lib/theme';
+import { useFocusTrap } from './lib/useFocusTrap';
 import NoteCard from './components/NoteCard';
 import ImportDialog from './components/ImportDialog';
 
@@ -62,7 +64,11 @@ const SORT_KEY = 'mymemo.sort';
 const THEME_LABELS: Record<ThemePref, string> = { system: '시스템', light: '라이트', dark: '다크' };
 const THEME_ICONS = { system: Monitor, light: Sun, dark: Moon } as const;
 
-type Toast = { kind: 'info' | 'error'; text: string };
+type Toast = {
+  kind: 'info' | 'error';
+  text: string;
+  action?: { label: string; run: () => void };
+};
 type PendingImport = { fileName: string; notes: Note[]; skipped: number };
 
 function loadSort(): SortKey {
@@ -92,6 +98,14 @@ export default function App() {
   const [toast, setToast] = useState<Toast | null>(null);
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const noteDialogRef = useRef<HTMLDivElement>(null);
+  // Element that opened a dialog, so focus can return there when it closes.
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  // Synchronous "modal is open" flag: the closing modal stays mounted during its
+  // exit animation with stale handlers, so a double click on 저장 must be ignored.
+  const modalOpenRef = useRef(false);
+  useFocusTrap(noteDialogRef, isModalOpen, returnFocusRef);
 
   // Form state
   const [title, setTitle] = useState('');
@@ -141,11 +155,30 @@ export default function App() {
   // Auto-dismiss informational toasts; errors stay until closed.
   useEffect(() => {
     if (!toast || toast.kind === 'error') return;
-    const t = window.setTimeout(() => setToast(null), 4000);
+    const t = window.setTimeout(() => setToast(null), toast.action ? 8000 : 4000);
     return () => window.clearTimeout(t);
   }, [toast]);
 
+  const rememberOpener = () => {
+    const active = document.activeElement;
+    returnFocusRef.current =
+      active instanceof HTMLElement && active !== document.body
+        ? active
+        : document.querySelector<HTMLElement>('[data-new-note]');
+  };
+
+  const openNewModal = useCallback(() => {
+    rememberOpener();
+    modalOpenRef.current = true;
+    setEditingId(null);
+    setTitle('');
+    setBody('');
+    setTagsInput('');
+    setIsModalOpen(true);
+  }, []);
+
   const closeModal = useCallback(() => {
+    modalOpenRef.current = false;
     setIsModalOpen(false);
     setEditingId(null);
     setTitle('');
@@ -153,11 +186,29 @@ export default function App() {
     setTagsInput('');
   }, []);
 
+  // Global shortcuts: "/" focuses search, "n" opens a new note.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (isModalOpen || pendingImport || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+      if (e.key === '/') {
+        e.preventDefault();
+        searchRef.current?.focus();
+      } else if (e.key === 'n' || e.key === 'N') {
+        e.preventDefault();
+        openNewModal();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isModalOpen, pendingImport, openNewModal]);
+
   // Close the modal with Escape.
   useEffect(() => {
     if (!isModalOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeModal();
+      if (e.key === 'Escape' && !e.isComposing) closeModal();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -191,15 +242,9 @@ export default function App() {
     setSelectedTags([]);
   };
 
-  const openNewModal = () => {
-    setEditingId(null);
-    setTitle('');
-    setBody('');
-    setTagsInput('');
-    setIsModalOpen(true);
-  };
-
   const openEditModal = (note: Note) => {
+    rememberOpener();
+    modalOpenRef.current = true;
     setEditingId(note.id);
     setTitle(note.title);
     setBody(note.body);
@@ -208,7 +253,7 @@ export default function App() {
   };
 
   const handleSaveNote = () => {
-    if (!title.trim()) return;
+    if (!modalOpenRef.current || !title.trim()) return;
 
     const now = new Date().toISOString();
     const fields = {
@@ -219,11 +264,10 @@ export default function App() {
     };
 
     if (editingId === null) {
-      setNotes(prev => {
-        // Date.now() can collide when notes are created in the same ms.
-        const id = Math.max(Date.now(), ...prev.map(n => n.id + 1));
-        return [{ id, ...fields, createdAt: now, pinned: false, archived: false }, ...prev];
-      });
+      setNotes(prev => [
+        { id: nextNoteId(prev), ...fields, createdAt: now, pinned: false, archived: false },
+        ...prev,
+      ]);
     } else {
       setNotes(prev => prev.map(n => (n.id === editingId ? { ...n, ...fields } : n)));
     }
@@ -231,10 +275,27 @@ export default function App() {
     closeModal();
   };
 
+  // Delete immediately and offer an undo in the toast instead of a blocking confirm.
   const handleDeleteNote = (note: Note) => {
-    if (window.confirm('정말 이 메모를 삭제할까요?')) {
-      setNotes(prev => prev.filter(n => n.id !== note.id));
-    }
+    const index = notes.findIndex(n => n.id === note.id);
+    if (index === -1) return;
+    setNotes(prev => prev.filter(n => n.id !== note.id));
+    setToast({
+      kind: 'info',
+      text: `'${note.title}' 메모를 삭제했습니다.`,
+      action: {
+        label: '실행 취소',
+        run: () => {
+          setNotes(prev => {
+            if (prev.some(n => n.id === note.id)) return prev;
+            const next = [...prev];
+            next.splice(Math.min(index, next.length), 0, note);
+            return next;
+          });
+          setToast(null);
+        },
+      },
+    });
   };
 
   // Pin/archive are organisational, so they don't bump updatedAt.
@@ -264,6 +325,10 @@ export default function App() {
     const file = input.files?.[0];
     input.value = ''; // allow choosing the same file again
     if (!file) return;
+    if (file.size > MAX_IMPORT_BYTES) {
+      setToast({ kind: 'error', text: '가져오기 실패: 파일이 너무 큽니다 (최대 10MB).' });
+      return;
+    }
     let text: string;
     try {
       text = await file.text();
@@ -297,6 +362,34 @@ export default function App() {
   };
   const cancelImport = useCallback(() => setPendingImport(null), []);
 
+  const renderToast = () =>
+    toast && (
+      <motion.div
+        key={toast.text}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={`pointer-events-auto max-w-md flex items-start gap-3 px-4 py-3 rounded-2xl shadow-xl text-sm ${
+          toast.kind === 'error'
+            ? 'bg-rose-600 text-white'
+            : 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+        }`}
+      >
+        <span className="flex-1">{toast.text}</span>
+        {toast.action && (
+          <button
+            type="button"
+            onClick={toast.action.run}
+            className="font-semibold text-indigo-300 hover:text-indigo-200 dark:text-indigo-600 dark:hover:text-indigo-700 whitespace-nowrap"
+          >
+            {toast.action.label}
+          </button>
+        )}
+        <button type="button" onClick={() => setToast(null)} aria-label="알림 닫기" className="opacity-70 hover:opacity-100">
+          <X size={16} />
+        </button>
+      </motion.div>
+    );
+
   const ThemeIcon = THEME_ICONS[themePref];
   const headerIconButton =
     'p-2 rounded-full text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-indigo-400 dark:hover:bg-slate-800 transition-colors';
@@ -326,9 +419,11 @@ export default function App() {
           <div className="flex-1 max-w-md relative group">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={18} />
             <input
+              ref={searchRef}
               type="search"
               aria-label="메모 검색"
-              placeholder="메모 검색..."
+              aria-keyshortcuts="/"
+              placeholder="메모 검색... ( / )"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 border-transparent border focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 rounded-full outline-none transition-all text-sm"
@@ -339,7 +434,13 @@ export default function App() {
             <button type="button" onClick={handleExport} aria-label="내보내기" title="JSON으로 내보내기" className={headerIconButton}>
               <Download size={18} />
             </button>
-            <button type="button" onClick={() => fileInputRef.current?.click()} aria-label="가져오기" title="JSON 가져오기" className={headerIconButton}>
+            <button
+              type="button"
+              onClick={(e) => {
+                returnFocusRef.current = e.currentTarget;
+                fileInputRef.current?.click();
+              }}
+              aria-label="가져오기" title="JSON 가져오기" className={headerIconButton}>
               <Upload size={18} />
             </button>
             <input
@@ -363,7 +464,10 @@ export default function App() {
 
           <button
             onClick={openNewModal}
+            data-new-note
             aria-label="새 메모"
+            aria-keyshortcuts="N"
+            title="새 메모 (N)"
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-full font-medium transition-colors shadow-lg shadow-indigo-200 dark:shadow-none"
           >
             <Plus size={18} />
@@ -496,28 +600,14 @@ export default function App() {
       </div>
 
       {/* Toast */}
+      {/* Live regions stay mounted so screen readers announce new messages. */}
       <div className="fixed bottom-4 inset-x-0 z-40 flex justify-center px-4 pointer-events-none">
-        <AnimatePresence>
-          {toast && (
-            <motion.div
-              key={toast.text}
-              role={toast.kind === 'error' ? 'alert' : 'status'}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-              className={`pointer-events-auto max-w-md flex items-start gap-3 px-4 py-3 rounded-2xl shadow-xl text-sm ${
-                toast.kind === 'error'
-                  ? 'bg-rose-600 text-white'
-                  : 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-              }`}
-            >
-              <span className="flex-1">{toast.text}</span>
-              <button type="button" onClick={() => setToast(null)} aria-label="알림 닫기" className="opacity-70 hover:opacity-100">
-                <X size={16} />
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <div role="status" aria-live="polite" className="contents">
+          {toast?.kind !== 'error' && renderToast()}
+        </div>
+        <div role="alert" className="contents">
+          {toast?.kind === 'error' && renderToast()}
+        </div>
       </div>
 
       <AnimatePresence>
@@ -529,6 +619,7 @@ export default function App() {
             existingCount={notes.length}
             onConfirm={confirmImport}
             onCancel={cancelImport}
+            returnFocusTo={returnFocusRef}
           />
         )}
       </AnimatePresence>
@@ -546,6 +637,7 @@ export default function App() {
             />
 
             <motion.div
+              ref={noteDialogRef}
               role="dialog"
               aria-modal="true"
               aria-labelledby={`${fieldId}-heading`}
@@ -553,7 +645,7 @@ export default function App() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.95 }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.nativeEvent.isComposing) {
                   e.preventDefault();
                   handleSaveNote();
                 }

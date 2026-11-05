@@ -1,5 +1,5 @@
 /* MyMemo service worker: app-shell precache + runtime caching. Hand-written, no build step. */
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE_PREFIX = 'mymemo-';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
@@ -64,20 +64,66 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-async function networkFirstNavigation(request) {
+const SCOPE_ROOT = scopeUrl('./');
+
+// Only the app's own HTML entry point may replace the cached shell; navigating
+// to e.g. /manifest.webmanifest must not overwrite the offline fallback.
+function isAppShellResponse(request, response) {
+  const url = new URL(request.url);
+  url.search = '';
+  url.hash = '';
+  const type = response.headers.get('content-type') || '';
+  return (
+    response.ok &&
+    response.type === 'basic' &&
+    !response.redirected &&
+    type.includes('text/html') &&
+    (url.href === SCOPE_ROOT || url.href === INDEX_URL)
+  );
+}
+
+// Drop hashed bundles from earlier deploys that the current shell no longer uses.
+async function pruneAssets(cache, html) {
+  const keep = new Set(assetUrlsFromHtml(html));
+  const keys = await cache.keys();
+  await Promise.all(
+    keys
+      .filter((req) => new URL(req.url).pathname.includes('/assets/') && !keep.has(req.url))
+      .map((req) => cache.delete(req)),
+  );
+}
+
+// A redirected Response cannot be used to answer a navigation; copy its body.
+async function cleanResponse(response) {
+  if (!response.redirected) return response;
+  const body = await response.blob();
+  return new Response(body, { headers: response.headers, status: response.status, statusText: response.statusText });
+}
+
+async function networkFirstNavigation(event) {
+  const { request } = event;
   const cache = await caches.open(CACHE_NAME);
   try {
     const response = await fetch(request);
-    if (response && response.ok) {
+    if (response && isAppShellResponse(request, response)) {
       // Keep the shell fresh so the offline fallback references current hashed assets.
-      cache.put(INDEX_URL, response.clone());
+      const copy = response.clone();
+      event.waitUntil(
+        copy
+          .text()
+          .then(async (html) => {
+            await cache.put(INDEX_URL, new Response(html, { headers: copy.headers }));
+            await pruneAssets(cache, html);
+          })
+          .catch(() => undefined),
+      );
     }
     return response;
   } catch (err) {
     const cached =
       (await cache.match(INDEX_URL, { ignoreVary: true })) ||
-      (await cache.match(scopeUrl('./'), { ignoreVary: true }));
-    if (cached) return cached;
+      (await cache.match(SCOPE_ROOT, { ignoreVary: true }));
+    if (cached) return cleanResponse(cached);
     throw err;
   }
 }
@@ -116,7 +162,7 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   if (request.mode === 'navigate') {
-    event.respondWith(networkFirstNavigation(request));
+    event.respondWith(networkFirstNavigation(event));
     return;
   }
 

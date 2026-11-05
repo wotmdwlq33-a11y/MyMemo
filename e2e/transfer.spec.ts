@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
-import { SEED_TITLES, addNote, gotoApp, noteCard, readStoredNotes } from './helpers';
+import { SEED_TITLES, STORAGE_KEY, addNote, gotoApp, noteCard, readStoredNotes } from './helpers';
 
 const importFile = (notes: unknown) => ({
   name: 'backup.json',
@@ -27,9 +27,14 @@ test('exports all notes as a JSON file', async ({ page }) => {
 
 test('merges imported notes with existing ones', async ({ page }) => {
   await gotoApp(page);
+  const seedCreatedAt = await page.evaluate(
+    key => JSON.parse(localStorage.getItem(key) ?? '[]').find((n: { id: number }) => n.id === 1).createdAt,
+    STORAGE_KEY,
+  );
   await page.getByTestId('import-input').setInputFiles(
     importFile([
-      { id: 1, title: '시안 작업 가이드 (새 버전)', body: 'x', tags: [], updatedAt: '2999-01-01T00:00:00.000Z' },
+      // Same id + same createdAt = same note; the newer edit wins.
+      { id: 1, title: '시안 작업 가이드 (새 버전)', body: 'x', tags: [], createdAt: seedCreatedAt, updatedAt: '2999-01-01T00:00:00.000Z' },
       { id: 500, title: '가져온 메모', body: '본문', tags: ['가져옴'], updatedAt: '2026-01-01T00:00:00.000Z' },
       { title: 'id 없음 — 건너뜀' },
     ]),
@@ -48,6 +53,19 @@ test('merges imported notes with existing ones', async ({ page }) => {
   await page.reload();
   const titles = (await readStoredNotes(page)).map(n => n.title).sort();
   expect(titles).toEqual(['가져온 메모', '시안 작업 가이드 (새 버전)', '읽어야 할 책 리스트', '프로젝트 아이디어'].sort());
+});
+
+test('keeps both notes when an imported note shares an id with an unrelated local one', async ({ page }) => {
+  await gotoApp(page);
+  await page.getByTestId('import-input').setInputFiles(
+    importFile([{ id: 2, title: '다른 기기의 메모', createdAt: '2020-01-01T00:00:00.000Z', updatedAt: '2020-01-02T00:00:00.000Z' }]),
+  );
+  await page.getByRole('dialog', { name: '메모 가져오기' }).getByRole('button', { name: '병합' }).click();
+  await expect(page.getByRole('status')).toContainText('1개 추가, 0개 갱신');
+  await expect(noteCard(page, '다른 기기의 메모')).toBeVisible();
+  await expect(noteCard(page, SEED_TITLES[1])).toBeVisible();
+  const ids = (await page.evaluate(k => JSON.parse(localStorage.getItem(k) ?? '[]'), STORAGE_KEY)).map((n: { id: number }) => n.id);
+  expect(new Set(ids).size).toBe(4);
 });
 
 test('replaces all notes after confirmation', async ({ page }) => {

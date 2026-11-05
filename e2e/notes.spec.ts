@@ -65,32 +65,34 @@ test('edits an existing note', async ({ page }) => {
   expect(stored).toHaveLength(SEED_TITLES.length);
 });
 
-test('deletes a note after confirming', async ({ page }) => {
+test('deletes a note immediately without a blocking dialog', async ({ page }) => {
   const target = SEED_TITLES[1];
-  page.once('dialog', (dialog) => {
-    expect(dialog.type()).toBe('confirm');
-    void dialog.accept();
+  page.on('dialog', () => {
+    throw new Error('delete should not open a native dialog');
   });
 
   await deleteButton(page, target).click();
 
   await expect(noteCard(page, target)).toHaveCount(0);
+  await expect(page.getByRole('status')).toContainText('삭제했습니다');
   const stored = await readStoredNotes(page);
   expect(stored.map((n) => n.title)).not.toContain(target);
 });
 
-test('keeps a note when delete is dismissed', async ({ page }) => {
+test('undo restores a deleted note in its place', async ({ page }) => {
+  const before = await readStoredNotes(page);
   const target = SEED_TITLES[1];
-  page.once('dialog', (dialog) => void dialog.dismiss());
 
   await deleteButton(page, target).click();
+  await page.getByRole('button', { name: '실행 취소' }).click();
 
   await expect(noteCard(page, target)).toBeVisible();
+  await expect(page.getByRole('button', { name: '실행 취소' })).toHaveCount(0);
+  expect(await readStoredNotes(page)).toEqual(before);
 });
 
 test('persists changes across reload', async ({ page }) => {
   await addNote(page, { title: '새로고침 후에도', body: '남아 있어야 함' });
-  page.once('dialog', (dialog) => void dialog.accept());
   await deleteButton(page, SEED_TITLES[2]).click();
   await expect(noteCard(page, SEED_TITLES[2])).toHaveCount(0);
 
@@ -125,4 +127,13 @@ test('filters notes by search term', async ({ page }) => {
   for (const title of SEED_TITLES) {
     await expect(noteCard(page, title)).toBeVisible();
   }
+});
+
+test('double-clicking save creates only one note', async ({ page }) => {
+  await page.getByRole('button', { name: '새 메모' }).click();
+  await fillNoteForm(page, { title: '한 번만' });
+  await noteDialog(page).getByRole('button', { name: '메모 저장' }).dblclick();
+  await expect(noteDialog(page)).toBeHidden();
+  const stored = await readStoredNotes(page);
+  expect(stored.filter((n) => n.title === '한 번만')).toHaveLength(1);
 });

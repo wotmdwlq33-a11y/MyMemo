@@ -98,3 +98,33 @@ describe('applyImport', () => {
     expect(result).toMatchObject({ added: 0, updated: 0, unchanged: 2 });
   });
 });
+
+describe('applyImport id conflicts', () => {
+  it('adds an unrelated note that shares an id (different createdAt) under a new id', () => {
+    const local = [makeNote({ id: 1, title: '샘플', createdAt: '2026-11-05T00:00:00.000Z', updatedAt: '2026-11-05T00:00:00.000Z' })];
+    const backup = [makeNote({ id: 1, title: '내가 고친 샘플', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-03-01T00:00:00.000Z' })];
+    const result = applyImport(local, backup, 'merge');
+    expect(result).toMatchObject({ added: 1, updated: 0, unchanged: 0 });
+    expect(result.notes.map(n => n.title).sort()).toEqual(['내가 고친 샘플', '샘플'].sort());
+    expect(new Set(result.notes.map(n => n.id)).size).toBe(2);
+  });
+
+  it('gives several conflicting notes distinct ids', () => {
+    const local = [makeNote({ id: 1 }), makeNote({ id: 2 })];
+    const other = '2020-01-01T00:00:00.000Z';
+    const result = applyImport(local, [makeNote({ id: 1, createdAt: other }), makeNote({ id: 2, createdAt: other })], 'merge');
+    expect(new Set(result.notes.map(n => n.id)).size).toBe(4);
+  });
+});
+
+describe('parseImport id validation', () => {
+  it('rejects ids that are not positive safe integers', () => {
+    const result = parseImport(JSON.stringify([
+      { id: 1e300, title: 'huge' },
+      { id: -1, title: 'negative' },
+      { id: 0.5, title: 'fraction' },
+      { id: 2, title: 'ok' },
+    ]));
+    expect(result).toMatchObject({ ok: true, skipped: 3 });
+  });
+});

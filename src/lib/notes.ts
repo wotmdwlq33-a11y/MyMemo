@@ -48,7 +48,8 @@ function isDateString(value: unknown): value is string {
 export function toNote(value: unknown): Note | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const v = value as Record<string, unknown>;
-  if (typeof v.id !== 'number' || !Number.isFinite(v.id) || typeof v.title !== 'string') {
+  // Ids must be positive safe integers so `id + 1` and comparisons stay exact.
+  if (typeof v.id !== 'number' || !Number.isSafeInteger(v.id) || v.id <= 0 || typeof v.title !== 'string') {
     return null;
   }
   const updatedAt = isDateString(v.updatedAt) ? v.updatedAt : new Date(0).toISOString();
@@ -95,6 +96,18 @@ export function loadNotes(storage: ReadableStorage | null, fallback: Note[]): No
     }
     return [];
   }
+}
+
+/**
+ * Pick an id for a new note: the current time, or one past the largest id in
+ * use if that is larger (avoids collisions when created in the same ms or when
+ * imported ids are in the future). Uses a loop so huge lists can't overflow
+ * the call stack the way `Math.max(...ids)` would.
+ */
+export function nextNoteId(notes: readonly Note[], now: number = Date.now()): number {
+  let max = 0;
+  for (const n of notes) if (n.id > max) max = n.id;
+  return Math.max(now, max + 1);
 }
 
 /** Persist notes. Returns false if storage is unavailable or full. */
