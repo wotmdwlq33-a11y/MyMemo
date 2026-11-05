@@ -84,17 +84,46 @@ export function loadNotes(storage: ReadableStorage | null, fallback: Note[]): No
   }
   if (raw === null) return fallback;
 
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) throw new Error('stored notes are not an array');
-    return parsed.map(toNote).filter((n): n is Note => n !== null);
-  } catch {
+  const notes = parseStoredNotes(raw);
+  if (notes === null) {
     try {
       storage.setItem(BACKUP_KEY, raw);
     } catch {
       // Ignore: backup is best effort.
     }
     return [];
+  }
+  return notes;
+}
+
+/**
+ * Parse the JSON stored under STORAGE_KEY. Returns null when it is not a JSON
+ * array; malformed entries are dropped.
+ */
+export function parseStoredNotes(raw: string): Note[] | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    return parsed.map(toNote).filter((n): n is Note => n !== null);
+  } catch {
+    return null;
+  }
+}
+
+/** Read the raw value saved by loadNotes when stored data was corrupt. */
+export function readCorruptBackup(storage: ReadableStorage | null): string | null {
+  try {
+    return storage?.getItem(BACKUP_KEY) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearCorruptBackup(storage: Pick<Storage, 'removeItem'> | null): void {
+  try {
+    storage?.removeItem(BACKUP_KEY);
+  } catch {
+    // Ignore.
   }
 }
 

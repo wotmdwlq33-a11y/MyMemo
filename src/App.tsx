@@ -22,10 +22,14 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import {
   type Note,
+  STORAGE_KEY,
+  clearCorruptBackup,
   getBrowserStorage,
   loadNotes,
   nextNoteId,
+  parseStoredNotes,
   parseTags,
+  readCorruptBackup,
   saveNotes,
 } from './lib/notes';
 import { type SortKey, type View, SORT_LABELS, countTags, queryNotes } from './lib/search';
@@ -80,6 +84,18 @@ function loadSort(): SortKey {
   }
 }
 
+/** Trigger a browser download of `text`. */
+function downloadText(text: string, fileName: string, type: string): void {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function prefersDark(): boolean {
   return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
     ? window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -126,6 +142,41 @@ export default function App() {
     saveFailed.current = !ok;
   }, [notes]);
 
+  // Keep several open tabs in sync: another tab's save fires a `storage` event
+  // here, and adopting its list prevents this tab from overwriting it later.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== STORAGE_KEY || e.newValue === null) return;
+      const next = parseStoredNotes(e.newValue);
+      if (next) setNotes(next);
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  // Ask the browser not to evict our storage under pressure (once, after the
+  // user has actually written something). Best effort; ignored if unsupported.
+  const persistRequested = useRef(false);
+  const requestPersistentStorage = () => {
+    if (persistRequested.current) return;
+    persistRequested.current = true;
+    void navigator.storage?.persisted?.()
+      .then(already => (already ? true : navigator.storage.persist?.()))
+      .catch(() => undefined);
+  };
+
+  // Raw data that loadNotes backed up because it could not be parsed.
+  const [corruptBackup, setCorruptBackup] = useState(() => readCorruptBackup(getBrowserStorage()));
+  const downloadCorruptBackup = () => {
+    if (corruptBackup === null) return;
+    downloadText(corruptBackup, 'mymemo-corrupt-backup.txt', 'text/plain');
+  };
+  const discardCorruptBackup = () => {
+    if (!window.confirm('손상된 데이터 백업을 삭제할까요? 삭제하면 되돌릴 수 없습니다.')) return;
+    clearCorruptBackup(getBrowserStorage());
+    setCorruptBackup(null);
+  };
+
   useEffect(() => {
     try {
       getBrowserStorage()?.setItem(SORT_KEY, sort);
@@ -167,9 +218,13 @@ export default function App() {
         : document.querySelector<HTMLElement>('[data-new-note]');
   };
 
+  // Snapshot of the form when the modal opened, to detect unsaved edits.
+  const initialFormRef = useRef({ title: '', body: '', tags: '' });
+
   const openNewModal = useCallback(() => {
     rememberOpener();
     modalOpenRef.current = true;
+    initialFormRef.current = { title: '', body: '', tags: '' };
     setEditingId(null);
     setTitle('');
     setBody('');
@@ -204,15 +259,28 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [isModalOpen, pendingImport, openNewModal]);
 
+  // Escape / backdrop clicks are easy to hit by accident, so they ask before
+  // throwing away edits. The explicit 취소 and ✕ buttons close directly.
+  const requestCloseModal = () => {
+    const initial = initialFormRef.current;
+    const dirty = title !== initial.title || body !== initial.body || tagsInput !== initial.tags;
+    if (dirty && !window.confirm('저장하지 않은 내용이 있습니다. 닫을까요?')) return;
+    closeModal();
+  };
+  const requestCloseRef = useRef(requestCloseModal);
+  useEffect(() => {
+    requestCloseRef.current = requestCloseModal;
+  });
+
   // Close the modal with Escape.
   useEffect(() => {
     if (!isModalOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !e.isComposing) closeModal();
+      if (e.key === 'Escape' && !e.isComposing) requestCloseRef.current();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isModalOpen, closeModal]);
+  }, [isModalOpen]);
 
   const activeCount = useMemo(() => notes.filter(n => !n.archived).length, [notes]);
   const archivedCount = notes.length - activeCount;
@@ -245,6 +313,7 @@ export default function App() {
   const openEditModal = (note: Note) => {
     rememberOpener();
     modalOpenRef.current = true;
+    initialFormRef.current = { title: note.title, body: note.body, tags: note.tags.join(', ') };
     setEditingId(note.id);
     setTitle(note.title);
     setBody(note.body);
@@ -269,9 +338,16 @@ export default function App() {
         ...prev,
       ]);
     } else {
-      setNotes(prev => prev.map(n => (n.id === editingId ? { ...n, ...fields } : n)));
+      const original = notes.find(n => n.id === editingId);
+      setNotes(prev =>
+        prev.some(n => n.id === editingId)
+          ? prev.map(n => (n.id === editingId ? { ...n, ...fields } : n))
+          : // Deleted meanwhile (e.g. in another tab): keep the user's edit.
+            [{ ...(original ?? { id: nextNoteId(prev), createdAt: now, pinned: false, archived: false }), ...fields }, ...prev],
+      );
     }
 
+    requestPersistentStorage();
     closeModal();
   };
 
@@ -308,15 +384,7 @@ export default function App() {
   };
 
   const handleExport = () => {
-    const blob = new Blob([exportNotes(notes)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = exportFileName();
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadText(exportNotes(notes), exportFileName(), 'application/json');
     setToast({ kind: 'info', text: `메모 ${notes.length}개를 내보냈습니다.` });
   };
 
@@ -524,6 +592,22 @@ export default function App() {
 
         {/* Main Content */}
         <main className="flex-1 min-w-0">
+          {corruptBackup !== null && (
+            <div role="alert" className="mb-6 p-4 rounded-2xl border border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200 text-sm">
+              <p className="font-semibold mb-1">저장된 메모 데이터를 읽지 못했습니다.</p>
+              <p className="mb-3">
+                손상된 원본은 따로 백업해 두었습니다. 파일로 받아 두면 직접 복구를 시도할 수 있어요.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={downloadCorruptBackup} className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium">
+                  백업 파일 받기
+                </button>
+                <button type="button" onClick={discardCorruptBackup} className="px-3 py-1.5 rounded-lg bg-white/70 hover:bg-white dark:bg-slate-900/60 dark:hover:bg-slate-900 font-medium">
+                  백업 삭제
+                </button>
+              </div>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-2 mb-6">
             <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 mr-1">
               {view === 'archived' ? '보관함' : '전체 메모'}
@@ -632,7 +716,7 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={closeModal}
+              onClick={requestCloseModal}
               className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm"
             />
 

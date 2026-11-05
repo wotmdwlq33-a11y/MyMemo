@@ -3,8 +3,11 @@ import {
   BACKUP_KEY,
   STORAGE_KEY,
   type Note,
+  clearCorruptBackup,
   loadNotes,
   nextNoteId,
+  parseStoredNotes,
+  readCorruptBackup,
   normalizeTags,
   parseTags,
   saveNotes,
@@ -162,5 +165,26 @@ describe('nextNoteId', () => {
   it('handles very large lists without overflowing the stack', () => {
     const many = Array.from({ length: 300_000 }, (_, i) => ({ id: i + 1 }) as Note);
     expect(nextNoteId(many, 0)).toBe(300_001);
+  });
+});
+
+describe('parseStoredNotes', () => {
+  it('returns null for non-arrays and invalid JSON', () => {
+    expect(parseStoredNotes('{')).toBeNull();
+    expect(parseStoredNotes('{"a":1}')).toBeNull();
+  });
+
+  it('parses and normalizes arrays', () => {
+    expect(parseStoredNotes(JSON.stringify([note(), { bad: true }]))).toEqual([note()]);
+  });
+});
+
+describe('corrupt backup helpers', () => {
+  it('reads and clears the backup', () => {
+    const storage = { ...memoryStorage({ [BACKUP_KEY]: 'raw' }), removeItem(k: string) { this.data.delete(k); } };
+    expect(readCorruptBackup(storage)).toBe('raw');
+    clearCorruptBackup(storage);
+    expect(readCorruptBackup(storage)).toBeNull();
+    expect(readCorruptBackup(null)).toBeNull();
   });
 });
