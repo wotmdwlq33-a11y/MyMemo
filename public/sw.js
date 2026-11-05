@@ -1,5 +1,5 @@
 /* MyMemo service worker: app-shell precache + runtime caching. Hand-written, no build step. */
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE_PREFIX = 'mymemo-';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
@@ -45,8 +45,16 @@ async function precache() {
   }
 }
 
+// No skipWaiting() here: on first install there is no active worker, so this one
+// activates right away (and clients.claim() takes the page). On an update it waits
+// until the page asks for it via SKIP_WAITING, so a deploy never swaps the worker
+// (and prunes cached assets) under a page that is still running the old bundle.
 self.addEventListener('install', (event) => {
-  event.waitUntil(precache().then(() => self.skipWaiting()));
+  event.waitUntil(precache());
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
