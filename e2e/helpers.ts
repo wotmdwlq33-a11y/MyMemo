@@ -61,3 +61,19 @@ export async function addNote(page: Page, note: NoteInput): Promise<void> {
 export async function readStoredNotes(page: Page): Promise<Array<{ title: string; body: string; tags: string[] }>> {
   return page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? '[]'), STORAGE_KEY);
 }
+
+/**
+ * Wait until enter animations have finished (cards and dialogs fade/scale in),
+ * so checks like axe's color-contrast see the final colors.
+ */
+export async function waitForAnimations(page: Page): Promise<void> {
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        [...document.querySelectorAll<HTMLElement>('[data-testid="note-card"], [role="dialog"]')].every(
+          el => getComputedStyle(el).opacity === '1' && ['none', 'matrix(1, 0, 0, 1, 0, 0)'].includes(getComputedStyle(el).transform),
+        ),
+      ),
+    )
+    .toBe(true);
+}

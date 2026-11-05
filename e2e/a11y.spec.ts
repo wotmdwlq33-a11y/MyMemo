@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
-import { gotoApp } from './helpers';
+import { gotoApp, waitForAnimations } from './helpers';
 
 for (const colorScheme of ['light', 'dark'] as const) {
   test.describe(`${colorScheme} theme`, () => {
@@ -8,6 +8,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
 
     test('main screen has no detectable a11y violations', async ({ page }) => {
       await gotoApp(page);
+      await waitForAnimations(page);
       const { violations } = await new AxeBuilder({ page }).analyze();
       expect(violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(', ')}`)).toEqual([]);
     });
@@ -16,6 +17,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await gotoApp(page);
       await page.getByRole('button', { name: /보관함/ }).click();
       await expect(page.getByText('보관된 메모가 없습니다.')).toBeVisible();
+      await waitForAnimations(page);
       const { violations } = await new AxeBuilder({ page }).analyze();
       expect(violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(', ')}`)).toEqual([]);
     });
@@ -24,7 +26,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await gotoApp(page);
       await page.getByRole('button', { name: '새 메모' }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
-      await page.waitForTimeout(400); // let the open animation settle
+      await waitForAnimations(page);
       const { violations } = await new AxeBuilder({ page }).include('[role="dialog"]').analyze();
       expect(violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(', ')}`)).toEqual([]);
     });
@@ -34,7 +36,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
 test('tag manager has no detectable a11y violations', async ({ page }) => {
   await gotoApp(page);
   await page.getByRole('button', { name: '태그 관리' }).click();
-  await page.waitForTimeout(400);
+  await waitForAnimations(page);
   const { violations } = await new AxeBuilder({ page }).include('[role="dialog"]').analyze();
   expect(violations.map(v => v.id)).toEqual([]);
 });
