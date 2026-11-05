@@ -46,6 +46,8 @@ import { useFocusTrap } from './lib/useFocusTrap';
 import { applyTagSuggestion, suggestTags } from './lib/tagSuggest';
 import NoteCard from './components/NoteCard';
 import ImportDialog from './components/ImportDialog';
+import TagManagerDialog from './components/TagManagerDialog';
+import { deleteTag, renameTag } from './lib/tagOps';
 
 const seedTime = new Date().toISOString();
 const seed = (id: number, title: string, body: string, tags: string[]): Note => ({
@@ -119,6 +121,7 @@ export default function App() {
   const [systemDark, setSystemDark] = useState(prefersDark);
   const [toast, setToast] = useState<Toast | null>(null);
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
+  const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const noteDialogRef = useRef<HTMLDivElement>(null);
@@ -250,7 +253,7 @@ export default function App() {
   // Global shortcuts: "/" focuses search, "n" opens a new note.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (isModalOpen || pendingImport || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
+      if (isModalOpen || pendingImport || isTagManagerOpen || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
       const target = e.target as HTMLElement | null;
       if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
       if (e.key === '/') {
@@ -263,7 +266,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isModalOpen, pendingImport, openNewModal]);
+  }, [isModalOpen, pendingImport, isTagManagerOpen, openNewModal]);
 
   // Escape / backdrop clicks are easy to hit by accident, so they ask before
   // throwing away edits. The explicit 취소 and ✕ buttons close directly.
@@ -289,7 +292,9 @@ export default function App() {
   }, [isModalOpen]);
 
   // Every tag in use (most frequent first), for suggestions in the editor.
-  const knownTags = useMemo(() => countTags(notes).map(([tag]) => tag), [notes]);
+  const allTagCounts = useMemo(() => countTags(notes), [notes]);
+  const knownTags = useMemo(() => allTagCounts.map(([tag]) => tag), [allTagCounts]);
+  const closeTagManager = useCallback(() => setIsTagManagerOpen(false), []);
   const tagSuggestions = isModalOpen ? suggestTags(knownTags, tagsInput) : [];
   const tagsFieldRef = useRef<HTMLInputElement>(null);
   const editingNote = editingId === null ? undefined : notes.find(n => n.id === editingId);
@@ -599,8 +604,21 @@ export default function App() {
               <span className={countBadge}>{archivedCount}</span>
             </button>
 
-            <div className="pt-4 pb-2 px-4">
+            <div className="pt-4 pb-2 px-4 flex items-center justify-between">
               <h2 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">태그 목록</h2>
+              {knownTags.length > 0 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    returnFocusRef.current = e.currentTarget;
+                    setIsTagManagerOpen(true);
+                  }}
+                  aria-label="태그 관리"
+                  className="text-xs font-medium text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
+                >
+                  관리
+                </button>
+              )}
             </div>
 
             {allTags.length === 0 && (
@@ -740,6 +758,21 @@ export default function App() {
           {toast?.kind === 'error' && renderToast()}
         </div>
       </div>
+
+      <AnimatePresence>
+        {isTagManagerOpen && (
+          <TagManagerDialog
+            tags={allTagCounts}
+            onRename={(from, to) => {
+              setNotes(prev => renameTag(prev, from, to));
+              setSelectedTags(prev => [...new Set(prev.map(t => (t === from ? to.trim() : t)))]);
+            }}
+            onDelete={(tag) => setNotes(prev => deleteTag(prev, tag))}
+            onClose={closeTagManager}
+            returnFocusTo={returnFocusRef}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {pendingImport && (

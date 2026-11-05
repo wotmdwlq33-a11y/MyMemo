@@ -30,3 +30,11 @@ for (const colorScheme of ['light', 'dark'] as const) {
     });
   });
 }
+
+test('tag manager has no detectable a11y violations', async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole('button', { name: '태그 관리' }).click();
+  await page.waitForTimeout(400);
+  const { violations } = await new AxeBuilder({ page }).include('[role="dialog"]').analyze();
+  expect(violations.map(v => v.id)).toEqual([]);
+});

@@ -9,6 +9,7 @@ AI Studio에서 보기: https://ai.studio/apps/9c459aa9-28d7-4bb4-862a-d4198416a
 - 메모 작성 · 수정 · 삭제 (카드를 클릭하면 수정 창이 열립니다. 삭제 후 알림의 "실행 취소"로 되돌릴 수 있습니다)
 - 쉼표로 구분한 태그 입력 (앞뒤 공백 제거, 중복 태그 자동 제거). 입력 중인 글자와 맞는 기존 태그를 추천하고 눌러서 추가
 - 수정 창에서 작성 · 수정 시각 표시
+- 태그 관리 (사이드바 "관리"): 태그 이름 바꾸기(같은 이름이 있으면 합치기), 태그 삭제(메모는 유지)
 - 제목 · 본문 · 태그 검색 (일치하는 부분 강조 표시)
 - 태그 필터: 사이드바나 카드의 태그를 눌러 여러 개를 함께 고를 수 있고(모두 포함하는 메모만 표시), 상단 칩의 ✕로 해제
 - 정렬: 최근 수정순 · 최근 작성순 · 제목순 (선택은 저장됨)
@@ -62,12 +63,14 @@ e2e 테스트를 처음 실행할 때는 브라우저가 필요합니다: `npx p
 ```
 src/
   App.tsx                    화면 상태와 메모 추가/수정/삭제/가져오기 로직
-  components/                NoteCard, ImportDialog, Highlight
+  components/                NoteCard, ImportDialog, TagManagerDialog, UpdatePrompt, Highlight
   ErrorBoundary.tsx          렌더링 오류 시 안내 화면
   lib/notes.ts               localStorage 읽기/쓰기, 메모 검증·태그 정리
   lib/search.ts              필터 · 정렬 · 검색어 강조
   lib/transfer.ts            JSON 내보내기/가져오기 검증과 병합
   lib/theme.ts               테마 설정 저장과 적용
+  lib/tagOps.ts, tagSuggest.ts  태그 이름 변경·삭제, 태그 추천
+  lib/useFocusTrap.ts        대화 상자 포커스 가두기
   registerServiceWorker.ts   서비스 워커 등록 (프로덕션 전용)
   main.tsx                   진입점
 public/
