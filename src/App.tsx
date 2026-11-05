@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useMemo, useId, useRef, useCallback, type ChangeEvent } from 'react';
+import { useState, useEffect, useMemo, useId, useRef, useCallback, useDeferredValue, type ChangeEvent } from 'react';
 import {
   Plus,
   Search,
@@ -65,6 +65,7 @@ const SEED_DATA: Note[] = [
 ];
 
 const SORT_KEY = 'mymemo.sort';
+const PAGE_SIZE = 60;
 const THEME_LABELS: Record<ThemePref, string> = { system: '시스템', light: '라이트', dark: '다크' };
 const THEME_ICONS = { system: Monitor, light: Sun, dark: Moon } as const;
 
@@ -297,10 +298,34 @@ export default function App() {
     [selectedTags, allTags],
   );
 
+  // Typing stays responsive with many notes: filtering uses a deferred copy.
+  const deferredSearch = useDeferredValue(searchTerm);
   const filteredNotes = useMemo(
-    () => queryNotes(notes, { search: searchTerm, tags: activeTags, view, sort }),
-    [notes, searchTerm, activeTags, view, sort],
+    () => queryNotes(notes, { search: deferredSearch, tags: activeTags, view, sort }),
+    [notes, deferredSearch, activeTags, view, sort],
   );
+
+  // Render the list in pages so thousands of notes don't block the page.
+  // The page count resets whenever the query changes.
+  const queryKey = JSON.stringify([deferredSearch, activeTags, view, sort]);
+  const [paging, setPaging] = useState({ key: queryKey, limit: PAGE_SIZE });
+  const limit = paging.key === queryKey ? paging.limit : PAGE_SIZE;
+  const visibleNotes = filteredNotes.slice(0, limit);
+  const remaining = filteredNotes.length - visibleNotes.length;
+  const showMore = useCallback(
+    () => setPaging({ key: queryKey, limit: limit + PAGE_SIZE }),
+    [queryKey, limit],
+  );
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || remaining <= 0 || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(e => e.isIntersecting)) showMore();
+    }, { rootMargin: '600px' });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [remaining, showMore]);
 
   const toggleTag = (tag: string) =>
     setSelectedTags(activeTags.includes(tag) ? activeTags.filter(t => t !== tag) : [...activeTags, tag]);
@@ -664,11 +689,11 @@ export default function App() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               <AnimatePresence mode="popLayout">
-                {filteredNotes.map((note) => (
+                {visibleNotes.map((note) => (
                   <NoteCard
                     key={note.id}
                     note={note}
-                    query={searchTerm}
+                    query={deferredSearch}
                     selectedTags={activeTags}
                     onOpen={openEditModal}
                     onDelete={handleDeleteNote}
@@ -678,6 +703,17 @@ export default function App() {
                   />
                 ))}
               </AnimatePresence>
+            </div>
+          )}
+          {remaining > 0 && (
+            <div ref={sentinelRef} className="flex justify-center pt-8">
+              <button
+                type="button"
+                onClick={showMore}
+                className="px-4 py-2 rounded-full text-sm font-medium bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+              >
+                더 보기 ({remaining}개 남음)
+              </button>
             </div>
           )}
         </main>
