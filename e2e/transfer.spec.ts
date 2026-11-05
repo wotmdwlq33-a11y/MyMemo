@@ -1,0 +1,86 @@
+import { readFile } from 'node:fs/promises';
+import { expect, test } from '@playwright/test';
+import { SEED_TITLES, addNote, gotoApp, noteCard, readStoredNotes } from './helpers';
+
+const importFile = (notes: unknown) => ({
+  name: 'backup.json',
+  mimeType: 'application/json',
+  buffer: Buffer.from(JSON.stringify({ format: 'mymemo', version: 1, exportedAt: new Date().toISOString(), notes })),
+});
+
+test('exports all notes as a JSON file', async ({ page }) => {
+  await gotoApp(page);
+  await addNote(page, { title: '내보낼 메모', body: '본문', tags: '백업' });
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: '내보내기' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^mymemo-\d{4}-\d{2}-\d{2}\.json$/);
+
+  const data = JSON.parse(await readFile(await download.path(), 'utf8'));
+  expect(data.format).toBe('mymemo');
+  expect(data.notes.map((n: { title: string }) => n.title)).toEqual(
+    expect.arrayContaining(['내보낼 메모', ...SEED_TITLES]),
+  );
+  await expect(page.getByRole('status')).toContainText('내보냈습니다');
+});
+
+test('merges imported notes with existing ones', async ({ page }) => {
+  await gotoApp(page);
+  await page.getByTestId('import-input').setInputFiles(
+    importFile([
+      { id: 1, title: '시안 작업 가이드 (새 버전)', body: 'x', tags: [], updatedAt: '2999-01-01T00:00:00.000Z' },
+      { id: 500, title: '가져온 메모', body: '본문', tags: ['가져옴'], updatedAt: '2026-01-01T00:00:00.000Z' },
+      { title: 'id 없음 — 건너뜀' },
+    ]),
+  );
+  const dialog = page.getByRole('dialog', { name: '메모 가져오기' });
+  await expect(dialog).toContainText('2개');
+  await expect(dialog).toContainText('1개 항목은 건너뜁니다');
+  await dialog.getByRole('button', { name: '병합' }).click();
+  await expect(dialog).toBeHidden();
+
+  await expect(page.getByRole('status')).toContainText('1개 추가, 1개 갱신');
+  await expect(noteCard(page, '가져온 메모')).toBeVisible();
+  await expect(noteCard(page, '시안 작업 가이드 (새 버전)')).toBeVisible();
+  await expect(noteCard(page, '읽어야 할 책 리스트')).toBeVisible();
+
+  await page.reload();
+  const titles = (await readStoredNotes(page)).map(n => n.title).sort();
+  expect(titles).toEqual(['가져온 메모', '시안 작업 가이드 (새 버전)', '읽어야 할 책 리스트', '프로젝트 아이디어'].sort());
+});
+
+test('replaces all notes after confirmation', async ({ page }) => {
+  await gotoApp(page);
+  await page.getByTestId('import-input').setInputFiles(importFile([{ id: 7, title: '유일한 메모' }]));
+  page.once('dialog', d => d.accept());
+  await page.getByRole('dialog', { name: '메모 가져오기' }).getByRole('button', { name: '모두 바꾸기' }).click();
+
+  await expect(noteCard(page, '유일한 메모')).toBeVisible();
+  for (const title of SEED_TITLES) await expect(noteCard(page, title)).toHaveCount(0);
+  expect((await readStoredNotes(page)).map(n => n.title)).toEqual(['유일한 메모']);
+});
+
+test('keeps notes when replace is not confirmed', async ({ page }) => {
+  await gotoApp(page);
+  await page.getByTestId('import-input').setInputFiles(importFile([{ id: 7, title: '유일한 메모' }]));
+  page.once('dialog', d => d.dismiss());
+  const dialog = page.getByRole('dialog', { name: '메모 가져오기' });
+  await dialog.getByRole('button', { name: '모두 바꾸기' }).click();
+  await dialog.getByRole('button', { name: '취소' }).click();
+  await expect(dialog).toBeHidden();
+  for (const title of SEED_TITLES) await expect(noteCard(page, title)).toBeVisible();
+  await expect(noteCard(page, '유일한 메모')).toHaveCount(0);
+});
+
+test('shows an error for an invalid file and changes nothing', async ({ page }) => {
+  await gotoApp(page);
+  await page.getByTestId('import-input').setInputFiles({
+    name: 'broken.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from('{not json'),
+  });
+  await expect(page.getByRole('alert')).toContainText('올바른 JSON 파일이 아닙니다');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(await readStoredNotes(page)).toHaveLength(SEED_TITLES.length);
+});
