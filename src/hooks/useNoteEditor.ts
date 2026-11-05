@@ -10,7 +10,7 @@ const EMPTY_FORM = { title: '', body: '', tags: '' };
  */
 export function useNoteEditor(
   returnFocusRef: RefObject<HTMLElement | null>,
-  onSave: (editingId: number | null, draft: NoteDraft) => void,
+  onSave: (editingId: number | null, draft: NoteDraft, original?: Note) => void,
 ) {
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -23,6 +23,8 @@ export function useNoteEditor(
   const modalOpenRef = useRef(false);
   // Snapshot of the form when the modal opened, to detect unsaved edits.
   const initialFormRef = useRef(EMPTY_FORM);
+  // The note being edited, as it was when the dialog opened.
+  const [original, setOriginal] = useState<Note | undefined>(undefined);
 
   const rememberOpener = useCallback(() => {
     const active = document.activeElement;
@@ -46,10 +48,15 @@ export function useNoteEditor(
     [rememberOpener],
   );
 
-  const openNew = useCallback(() => openWith(null, EMPTY_FORM), [openWith]);
+  const openNew = useCallback(() => {
+    setOriginal(undefined);
+    openWith(null, EMPTY_FORM);
+  }, [openWith]);
 
-  const openEdit = (note: Note) =>
+  const openEdit = (note: Note) => {
+    setOriginal(note);
     openWith(note.id, { title: note.title, body: note.body, tags: note.tags.join(', ') });
+  };
 
   const close = useCallback(() => {
     modalOpenRef.current = false;
@@ -71,7 +78,7 @@ export function useNoteEditor(
 
   const save = () => {
     if (!modalOpenRef.current || !title.trim()) return;
-    onSave(editingId, { title, body, tagsInput });
+    onSave(editingId, { title, body, tagsInput }, original);
     close();
   };
 

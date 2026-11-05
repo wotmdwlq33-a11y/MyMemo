@@ -60,8 +60,12 @@ export function useNotes(setToast: SetToast) {
       .catch(() => undefined);
   };
 
-  /** Create (editingId === null) or update a note from the editor's fields. */
-  const saveNote = (editingId: number | null, draft: NoteDraft) => {
+  /**
+   * Create (editingId === null) or update a note from the editor's fields.
+   * `original` is the note as it was when the editor opened, used to restore it
+   * with its id/dates/flags if it was deleted meanwhile (e.g. in another tab).
+   */
+  const saveNote = (editingId: number | null, draft: NoteDraft, original?: Note) => {
     const now = new Date().toISOString();
     const fields = {
       title: draft.title.trim(),
@@ -73,13 +77,18 @@ export function useNotes(setToast: SetToast) {
     if (editingId === null) {
       setNotes(prev => [{ id: nextNoteId(prev), ...fields, createdAt: now, pinned: false, archived: false }, ...prev]);
     } else {
-      const original = notes.find(n => n.id === editingId);
+      const base = original ?? notes.find(n => n.id === editingId);
       setNotes(prev =>
         prev.some(n => n.id === editingId)
           ? prev.map(n => (n.id === editingId ? { ...n, ...fields } : n))
           : // Deleted meanwhile (e.g. in another tab): keep the user's edit.
             [
-              { ...(original ?? { id: nextNoteId(prev), createdAt: now, pinned: false, archived: false }), ...fields },
+              {
+                ...(base && !prev.some(n => n.id === base.id)
+                  ? base
+                  : { id: nextNoteId(prev), createdAt: now, pinned: false, archived: false }),
+                ...fields,
+              },
               ...prev,
             ],
       );
