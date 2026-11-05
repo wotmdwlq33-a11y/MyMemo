@@ -15,16 +15,13 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-
-type Note = {
-  id: number;
-  title: string;
-  body: string;
-  tags: string[];
-  updatedAt: string;
-};
-
-const STORAGE_KEY = 'mymemo.notes';
+import {
+  type Note,
+  getBrowserStorage,
+  loadNotes,
+  parseTags,
+  saveNotes,
+} from './lib/notes';
 
 const SEED_DATA: Note[] = [
   {
@@ -51,7 +48,7 @@ const SEED_DATA: Note[] = [
 ];
 
 export default function App() {
-  const [notes, setNotes] = useState<Note[]>([]);
+  const [notes, setNotes] = useState<Note[]>(() => loadNotes(getBrowserStorage(), SEED_DATA));
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
@@ -61,22 +58,10 @@ export default function App() {
   const [body, setBody] = useState('');
   const [tagsInput, setTagsInput] = useState('');
 
-  // Initial load
+  // Single source of persistence: every change to `notes` (including the
+  // initial seed and deleting the last note) is written to storage here.
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      setNotes(JSON.parse(saved));
-    } else {
-      setNotes(SEED_DATA);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_DATA));
-    }
-  }, []);
-
-  // Save changes
-  useEffect(() => {
-    if (notes.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
-    }
+    saveNotes(getBrowserStorage(), notes);
   }, [notes]);
 
   const allTags = useMemo(() => {
@@ -109,13 +94,11 @@ export default function App() {
       id: Date.now(),
       title: title.trim(),
       body: body.trim(),
-      tags: tagsInput.split(',').map(t => t.trim()).filter(Boolean),
+      tags: parseTags(tagsInput),
       updatedAt: new Date().toISOString(),
     };
 
-    const updatedNotes = [newNote, ...notes];
-    setNotes(updatedNotes);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedNotes));
+    setNotes(prev => [newNote, ...prev]);
     
     // Reset and close
     setTitle('');
@@ -126,9 +109,7 @@ export default function App() {
 
   const handleDeleteNote = (id: number) => {
     if (window.confirm('정말 이 메모를 삭제할까요?')) {
-      const updatedNotes = notes.filter(n => n.id !== id);
-      setNotes(updatedNotes);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedNotes));
+      setNotes(prev => prev.filter(n => n.id !== id));
     }
   };
 
